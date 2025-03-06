@@ -1,6 +1,7 @@
-import { serve } from '@hono/node-server';
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Button, Frog } from 'frog';
 import { neynar } from 'frog/middlewares';
+import { serve } from "@hono/node-server";
 
 
 
@@ -21,6 +22,8 @@ export const app = new Frog({
     features: ['interactor', 'cast'],
   })
 );
+
+app.use("/*", serveStatic({ root: "./public" }));
 
 async function fetchQueryResult(fid: any, queryId: string, columnName: string) {
   try {
@@ -167,11 +170,11 @@ app.frame('/', async (c) => {
   });
 });
 
-const port = Number(process.env.PORT) || 3000;
+const port = process.env.PORT || 3000;
 
-serve({
-  fetch: app.fetch,
-  port,
-});
+// اطمینان از استفاده صحیح از عدد به عنوان پورت
+serve(app);
+
+console.log(`Server is running on port ${port}`);
 
 
