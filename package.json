@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node index.js",
+    "dev": "vite", 
   "start": "npm run dev"
   },
   "dependencies": {
