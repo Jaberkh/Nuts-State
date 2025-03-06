@@ -1,9 +1,7 @@
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Button, Frog } from 'frog';
-import { neynar } from 'frog/middlewares';
 import { serve } from "@hono/node-server";
-
-
+import { neynar } from 'frog/middlewares';
 
 export const app = new Frog({
   title: 'Frog Frame',
@@ -23,14 +21,14 @@ export const app = new Frog({
   })
 );
 
-app.use("/*", serveStatic({ root: "./public" }));
+app.use('/*', serveStatic({ root: './public' }));
 
 async function fetchQueryResult(fid: any, queryId: string, columnName: string) {
   try {
     const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/results`, {
       method: 'GET',
       headers: {
-        'X-Dune-API-Key': 'IlRZ0c1un5a3alLsYD23THLU2nVLO5gB'
+        'X-Dune-API-Key': 'jiM9TmNdRZNuoecwWHeTGPtll9S5WkQG'
       }
     });
     
@@ -76,14 +74,14 @@ app.frame('/', async (c) => {
   const username = urlParams.get("username") || (c.var as any)?.interactor?.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || (c.var as any)?.interactor?.pfpUrl || "";
   
-  const todayPeanutCount = await fetchQueryResult(fid, '4814361', 'peanut_count');
-  const totalPeanutCount = await fetchQueryResult(fid, '4814399', 'total_peanut_count');
-  const sentPeanutCount = await fetchQueryResult(fid, '4814449', 'sent_peanut_count');
+  const todayPeanutCount = await fetchQueryResult(fid, '4816299', 'peanut_count');
+  const totalPeanutCount = await fetchQueryResult(fid, '4815993', 'total_peanut_count');
+  const sentPeanutCount = await fetchQueryResult(fid, '4811780', 'sent_peanut_count');
   const remainingAllowance = Math.max(30 - sentPeanutCount, 0);
-  const userRank = await fetchQueryResult(fid, '4814531', 'rank');
+  const userRank = await fetchQueryResult(fid, '4801919', 'rank');
 
   const hashId = await getOrGenerateHashId(fid);
-  const frameUrl = `https://nuts-production-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
+  const frameUrl = `https://b4b7-109-61-80-200.ngrok-free.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
 
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
     `Check out your 🥜 stats! \n\n Frame by @arsalang75523 & @jeyloo.eth `
@@ -176,5 +174,3 @@ const port = process.env.PORT || 3000;
 serve(app);
 
 console.log(`Server is running on port ${port}`);
-
-
