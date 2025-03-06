@@ -4,7 +4,7 @@ import { serve } from "@hono/node-server";
 import { neynar } from 'frog/middlewares';
 
 export const app = new Frog({
-  title: 'Frog Frame',
+  title: 'Nut State',
   imageOptions: {
     fonts: [
       {
