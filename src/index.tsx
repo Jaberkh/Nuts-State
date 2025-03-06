@@ -54,7 +54,7 @@ function generateHashId(fid: string): string {
   return `${timestamp}-${fid}-${randomHash}`;
 }
 
-const hashIdCache: Record<string, string> = {}; // کش برای تست
+const hashIdCache: Record<string, string> = {}; 
 
 async function getOrGenerateHashId(fid: string): Promise<string> {
   if (hashIdCache[fid]) {
@@ -69,7 +69,7 @@ async function getOrGenerateHashId(fid: string): Promise<string> {
 app.frame('/', async (c) => {
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
 
-  // اگر فریم از طریق Embed لود شده باشه، اطلاعات رو از URL بگیر
+ 
   const fid = urlParams.get("fid") || (c.var as any)?.interactor?.fid || "N/A";
   const username = urlParams.get("username") || (c.var as any)?.interactor?.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || (c.var as any)?.interactor?.pfpUrl || "";
@@ -170,7 +170,7 @@ app.frame('/', async (c) => {
 
 const port = process.env.PORT || 3000;
 
-// اطمینان از استفاده صحیح از عدد به عنوان پورت
+
 serve(app);
 
 console.log(`Server is running on port ${port}`);
