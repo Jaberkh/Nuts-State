@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "frog dev"
+    "dev": "node index.js",
+  "start": "npm run dev"
   },
   "dependencies": {
     "@hono/node-server": "latest",
