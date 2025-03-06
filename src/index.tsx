@@ -3,6 +3,8 @@ import { Button, Frog } from 'frog';
 import { devtools } from 'frog/dev';
 import { neynar } from 'frog/middlewares';
 
+
+
 export const app = new Frog({
   title: 'Frog Frame',
   imageOptions: {
@@ -22,6 +24,13 @@ export const app = new Frog({
 );
 
 app.use('/*', serveStatic({ root: './public' }));
+app.use(async (c, next) => {
+  c.res.headers.set("Access-Control-Allow-Origin", "*");
+  c.res.headers.set("X-Frame-Options", "ALLOWALL");
+  c.res.headers.set("Content-Security-Policy", "frame-ancestors *");
+  await next();
+});
+
 
 async function fetchQueryResult(fid: any, queryId: string, columnName: string) {
   try {
