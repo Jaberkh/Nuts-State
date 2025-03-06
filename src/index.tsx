@@ -1,6 +1,5 @@
-import { serveStatic } from '@hono/node-server/serve-static';
+import { serve } from '@hono/node-server';
 import { Button, Frog } from 'frog';
-import { devtools } from 'frog/dev';
 import { neynar } from 'frog/middlewares';
 
 
@@ -22,15 +21,6 @@ export const app = new Frog({
     features: ['interactor', 'cast'],
   })
 );
-
-app.use('/*', serveStatic({ root: './public' }));
-app.use(async (c, next) => {
-  c.res.headers.set("Access-Control-Allow-Origin", "*");
-  c.res.headers.set("X-Frame-Options", "ALLOWALL");
-  c.res.headers.set("Content-Security-Policy", "frame-ancestors *");
-  await next();
-});
-
 
 async function fetchQueryResult(fid: any, queryId: string, columnName: string) {
   try {
@@ -177,4 +167,11 @@ app.frame('/', async (c) => {
   });
 });
 
-devtools(app, { serveStatic });
+const port = Number(process.env.PORT) || 3000;
+
+serve({
+  fetch: app.fetch,
+  port,
+});
+
+
