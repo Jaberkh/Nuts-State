@@ -3,6 +3,15 @@ import { Button, Frog } from 'frog';
 import { serve } from "@hono/node-server";
 import { neynar } from 'frog/middlewares';
 
+const cache: Record<string, {
+  todayPeanutCount: number;
+  totalPeanutCount: number;
+  sentPeanutCount: number;
+  remainingAllowance: number;
+  userRank: number;
+  lastUpdated: number;
+}> = {};
+
 export const app = new Frog({
   title: 'Nut State',
   imageOptions: {
@@ -28,19 +37,13 @@ async function fetchQueryResult(fid: any, queryId: string, columnName: string) {
     const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/results`, {
       method: 'GET',
       headers: {
-        'X-Dune-API-Key': 'jiM9TmNdRZNuoecwWHeTGPtll9S5WkQG'
+        'X-Dune-API-Key': 'RhjCYVQmxhjppZqg7Z8DUWwpyFpjPYf4'
       }
     });
     
     const data = await response.json();
-    console.log(`Dune API Response for Query ${queryId}:`, data);
-    
     const results = data?.result?.rows || [];
-    console.log("Fetched Rows:", results);
-    
     const userResult = results.find((row: { fid: any; parent_fid: any }) => row.fid == fid || row.parent_fid == fid)?.[columnName] || 0;
-    console.log(`Result for FID ${fid} from Query ${queryId}:`, userResult);
-    
     return userResult;
   } catch (error) {
     console.error(`Error fetching data from Query ${queryId}:`, error);
@@ -65,20 +68,63 @@ async function getOrGenerateHashId(fid: string): Promise<string> {
   return newHashId;
 }
 
+function shouldUpdateApi() {
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const utcMinutes = now.getUTCMinutes();
+  const totalMinutes = utcHours * 60 + utcMinutes;
+
+  const updateTimes = [360, 900, 1260];
+  
+  return updateTimes.some(time => Math.abs(totalMinutes - time) <= 5);
+}
+
+async function getUserData(fid: string) {
+  const now = Date.now();
+  const cachedData = cache[fid];
+
+  if (cachedData && (now - cachedData.lastUpdated) < 24 * 60 * 60 * 1000) {
+    return cachedData;
+  }
+
+  // if (shouldUpdateApi()) {
+    const todayPeanutCount = await fetchQueryResult(fid, '4816299', 'peanut_count');
+    const totalPeanutCount = await fetchQueryResult(fid, '4815993', 'total_peanut_count');
+    const sentPeanutCount = await fetchQueryResult(fid, '4811780', 'sent_peanut_count');
+    const remainingAllowance = Math.max(30 - sentPeanutCount, 0);
+    const userRank = await fetchQueryResult(fid, '4801919', 'rank');
+
+    cache[fid] = {
+      todayPeanutCount,
+      totalPeanutCount,
+      sentPeanutCount,
+      remainingAllowance,
+      userRank,
+      lastUpdated: now
+    };
+  // }
+
+  return cachedData || {
+    todayPeanutCount: 0,
+    totalPeanutCount: 0,
+    sentPeanutCount: 0,
+    remainingAllowance: 30,
+    userRank: 0,
+    lastUpdated: now
+  };
+}
 
 app.frame('/', async (c) => {
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
 
- 
+  // اگر فریم از طریق Embed لود شده باشه، اطلاعات رو از URL بگیر
   const fid = urlParams.get("fid") || (c.var as any)?.interactor?.fid || "N/A";
   const username = urlParams.get("username") || (c.var as any)?.interactor?.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || (c.var as any)?.interactor?.pfpUrl || "";
-  
-  const todayPeanutCount = await fetchQueryResult(fid, '4816299', 'peanut_count');
-  const totalPeanutCount = await fetchQueryResult(fid, '4815993', 'total_peanut_count');
-  const sentPeanutCount = await fetchQueryResult(fid, '4811780', 'sent_peanut_count');
-  const remainingAllowance = Math.max(30 - sentPeanutCount, 0);
-  const userRank = await fetchQueryResult(fid, '4801919', 'rank');
+
+  // دریافت داده‌ها (از کش یا API)
+  const userData = await getUserData(fid);
+  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = userData;
 
   const hashId = await getOrGenerateHashId(fid);
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
@@ -86,7 +132,6 @@ app.frame('/', async (c) => {
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
     `Check out your 🥜 stats! \n\n Frame by @arsalang75523 & @jeyloo.eth `
   )}&embeds[]=${encodeURIComponent(frameUrl)}`;
-  
   
   return c.res({
     image: (
@@ -170,7 +215,6 @@ app.frame('/', async (c) => {
 
 const port = process.env.PORT || 3000;
 
-
+// اطمینان از استفاده صحیح از عدد به عنوان پورت
 serve(app);
-
 console.log(`Server is running on port ${port}`);
