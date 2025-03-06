@@ -5,11 +5,9 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "moduleResolution": "Node", // تغییر از "bundler" به "Node" برای سازگاری با Node.js
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
     "jsx": "react-jsx",
     "jsxImportSource": "frog/jsx",
 
@@ -17,7 +15,13 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Build output */
+    "outDir": "build", // مسیر خروجی فایل‌های کامپایل شده
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["src/**/*"], // فرض بر این است که فایل‌های TypeScript در پوشه src قرار دارند
+  "exclude": ["node_modules"]
 }
