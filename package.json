@@ -3,10 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "frog dev",
-    "build": "tsc",
-    "start": "node build/index.js"
-  },
+  "dev": "vite",
+  "build": "vite build",
+  "preview": "vite preview",
+  "start": "vite preview --port 3000"
+}
+,
   "dependencies": {
     "@hono/node-server": "latest",
     "frog": "latest",
