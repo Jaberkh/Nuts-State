@@ -68,16 +68,6 @@ async function getOrGenerateHashId(fid: string): Promise<string> {
   return newHashId;
 }
 
-function shouldUpdateApi() {
-  const now = new Date();
-  const utcHours = now.getUTCHours();
-  const utcMinutes = now.getUTCMinutes();
-  const totalMinutes = utcHours * 60 + utcMinutes;
-
-  const updateTimes = [360, 900, 1260];
-  
-  return updateTimes.some(time => Math.abs(totalMinutes - time) <= 5);
-}
 
 async function getUserData(fid: string) {
   const now = Date.now();
@@ -125,7 +115,7 @@ app.frame('/', async (c) => {
   // دریافت داده‌ها (از کش یا API)
   const userData = await getUserData(fid);
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = userData;
-
+  console.log(`sentPeanutCount ${sentPeanutCount}`);
   const hashId = await getOrGenerateHashId(fid);
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
 
