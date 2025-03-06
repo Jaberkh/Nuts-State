@@ -81,7 +81,7 @@ app.frame('/', async (c) => {
   const userRank = await fetchQueryResult(fid, '4814531', 'rank');
 
   const hashId = await getOrGenerateHashId(fid);
-  const frameUrl = `https://194e-109-61-80-200.ngrok-free.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
+  const frameUrl = `https://nuts-production-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
 
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
     `Check out your 🥜 stats! \n\n Frame by @arsalang75523 & @jeyloo.eth `
