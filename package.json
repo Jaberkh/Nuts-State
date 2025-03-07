@@ -10,9 +10,11 @@
   "dependencies": {
     "@hono/node-server": "latest",
     "dotenv": "^16.4.7",
-    "frog": "latest",
+    "frog": "^0.18.3",
     "hashids": "^2.3.0",
-    "hono": "^4"
+    "hono": "^4",
+    "satori": "^0.12.1",
+    "yoga-wasm-web": "^0.3.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

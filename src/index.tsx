@@ -42,6 +42,7 @@ async function saveCache() {
 console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
 
+// تعریف اپ
 export const app = new Frog({
   title: 'Nut State',
   imageOptions: {
@@ -218,7 +219,8 @@ app.frame('/', async (c) => {
 
   console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
-  console.log('sentPeanutCount',sentPeanutCount);
+  console.log('[Frame] User data fetched');
+  console.log(`[Frame] Data - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}`);
 
   console.log('[Frame] Generating hashId');
   const hashId = await getOrGenerateHashId(fid);
@@ -232,7 +234,8 @@ app.frame('/', async (c) => {
   console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
 
   try {
-    console.log('[Frame] Building response');
+    console.log('[Frame] Preparing to render image with:', { fid, username, pfpUrl, todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank });
+
     return c.res({
       image: (
         <div style={{
@@ -249,15 +252,15 @@ app.frame('/', async (c) => {
           )}
           <p style={{ position: 'absolute', top: '15%', left: '60%', transform: 'translate(-50%, -50%)',
             color: 'white', fontSize: '52px', fontWeight: 'bold', fontFamily: 'Poetsen One',
-            textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username}</p>
+            textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username || 'Unknown'}</p>
           <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
             color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
-            FID: {fid}
+            FID: {fid || 'N/A'}
           </p>
-          <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
-          <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
-          <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
-          <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
+          <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount || 0)}</p>
+          <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount || 0)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance || 0)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank || 0)}</p>
         </div>
       ),
       intents: [
@@ -268,10 +271,11 @@ app.frame('/', async (c) => {
     });
   } catch (error) {
     console.error('[Frame] Render error:', error);
+    console.error('[Frame] Failed with inputs:', { fid, username, pfpUrl, todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank });
     return c.res({
       image: (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
-          <p style={{ color: '#ff0000', fontSize: '30px' }}>Error rendering frame. Check logs.</p>
+          <p style={{ color: '#ff0000', fontSize: '30px' }}>Error rendering frame. Please try again later.</p>
         </div>
       ),
       intents: [<Button value="my_state">Try Again</Button>]
