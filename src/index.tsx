@@ -207,7 +207,7 @@ app.frame('/', async (c) => {
   console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
   console.log('[Frame] User data fetched');
-
+  console.log(`sentPeanutCount ${sentPeanutCount}`);
   console.log('[Frame] Generating hashId');
   const hashId = await getOrGenerateHashId(fid);
   console.log('[Frame] Building frame URL');
