@@ -111,7 +111,7 @@ function shouldUpdateApi(lastUpdated: number) {
   const currentDay = getCurrentUTCDay();
   const isNewDay = lastUpdated < currentDay;
 
-  const updateTimes = [180, 540, 900, 1080, 1260]; // ۳:۰۰، ۹:۰۰، ۱۵:۰۰، ۱۸:۰۰، ۲۱:۰۰ UTC
+  const updateTimes = [180, 540, 900, 1080, 1260];
   const isUpdateTime = updateTimes.some(time => Math.abs(totalMinutes - time) <= 5);
 
   console.log(`[UpdateCheck] Time: ${totalMinutes} min (${utcHours}:${utcMinutes} UTC), Last Updated: ${new Date(lastUpdated).toUTCString()}, New Day: ${isNewDay}, Update Time: ${isUpdateTime}`);
@@ -218,9 +218,9 @@ app.frame('/', async (c) => {
 
   console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
-  console.log('[Frame] User data fetched');
-  console.log('[Frame] User data fetched');
   console.log('sentPeanutCount',sentPeanutCount);
+
+  console.log('[Frame] Generating hashId');
   const hashId = await getOrGenerateHashId(fid);
   console.log('[Frame] Building frame URL');
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
@@ -231,40 +231,52 @@ app.frame('/', async (c) => {
   )}&embeds[]=${encodeURIComponent(frameUrl)}`;
   console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
 
-  console.log('[Frame] Building response');
-  return c.res({
-    image: (
-      <div style={{
-        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-        width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/724/573425032_bg.png)',
-        backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-        textAlign: 'center', position: 'relative'
-      }}>
-        {pfpUrl && (
-          <img src={pfpUrl} alt="Profile Picture" style={{
-            width: '230px', height: '230px', borderRadius: '50%', position: 'absolute',
-            top: '22%', left: '12%', transform: 'translate(-50%, -50%)', border: '3px solid white'
-          }} />
-        )}
-        <p style={{ position: 'absolute', top: '15%', left: '60%', transform: 'translate(-50%, -50%)',
-          color: 'white', fontSize: '52px', fontWeight: 'bold', fontFamily: 'Poetsen One',
-          textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username}</p>
-        <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
-          color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
-          FID: {fid}
-        </p>
-        <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
-        <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
-        <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
-        <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
-      </div>
-    ),
-    intents: [
-      <Button value="my_state">My State</Button>,
-      <Button.Link href={composeCastUrl}>Share</Button.Link>,
-      <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
-    ],
-  });
+  try {
+    console.log('[Frame] Building response');
+    return c.res({
+      image: (
+        <div style={{
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/724/573425032_bg.png)',
+          backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+          textAlign: 'center', position: 'relative'
+        }}>
+          {pfpUrl && typeof pfpUrl === 'string' && pfpUrl.length > 0 && (
+            <img src={pfpUrl} alt="Profile Picture" style={{
+              width: '230px', height: '230px', borderRadius: '50%', position: 'absolute',
+              top: '22%', left: '12%', transform: 'translate(-50%, -50%)', border: '3px solid white'
+            }} />
+          )}
+          <p style={{ position: 'absolute', top: '15%', left: '60%', transform: 'translate(-50%, -50%)',
+            color: 'white', fontSize: '52px', fontWeight: 'bold', fontFamily: 'Poetsen One',
+            textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username}</p>
+          <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
+            color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
+            FID: {fid}
+          </p>
+          <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
+          <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
+        </div>
+      ),
+      intents: [
+        <Button value="my_state">My State</Button>,
+        <Button.Link href={composeCastUrl}>Share</Button.Link>,
+        <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
+      ],
+    });
+  } catch (error) {
+    console.error('[Frame] Render error:', error);
+    return c.res({
+      image: (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
+          <p style={{ color: '#ff0000', fontSize: '30px' }}>Error rendering frame. Check logs.</p>
+        </div>
+      ),
+      intents: [<Button value="my_state">Try Again</Button>]
+    });
+  }
 });
 
 const port = process.env.PORT || 3000;
