@@ -22,6 +22,24 @@ let cache: {
   lastUpdateDay: 0
 };
 
+const requestTimestamps: number[] = [];
+const MAX_REQUESTS = 30;
+const DURATION = 60000; // 60 ثانیه
+
+function checkRateLimit(): boolean {
+  const now = Date.now();
+  while (requestTimestamps.length > 0 && now - requestTimestamps[0] > DURATION) {
+    requestTimestamps.shift();
+  }
+  if (requestTimestamps.length >= MAX_REQUESTS) {
+    console.log('[RateLimit] Too many requests. Remaining:', MAX_REQUESTS - requestTimestamps.length);
+    return false;
+  }
+  requestTimestamps.push(now);
+  console.log('[RateLimit] Allowed. Remaining:', MAX_REQUESTS - requestTimestamps.length);
+  return true;
+}
+
 async function loadCache() {
   console.log('[Cache] Loading cache from file');
   try {
@@ -42,7 +60,6 @@ async function saveCache() {
 console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
 
-// تعریف اپ
 export const app = new Frog({
   title: 'Nut State',
   imageOptions: {
@@ -195,6 +212,17 @@ function getUserDataFromCache(fid: string) {
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
   console.log('[Frame] User-Agent:', c.req.header('user-agent'));
+
+  if (!checkRateLimit()) {
+    return c.res({
+      image: (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
+          <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Too many requests. Wait a minute.</p>
+        </div>
+      ),
+      intents: [<Button value="my_state">Try Again</Button>]
+    });
+  }
 
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
   console.log('[Frame] URL Params:', urlParams.toString());

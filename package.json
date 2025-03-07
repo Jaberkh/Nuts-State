@@ -13,11 +13,13 @@
     "frog": "^0.18.3",
     "hashids": "^2.3.0",
     "hono": "^4",
+    "ratelimiter": "^3.4.1",
     "satori": "^0.12.1",
     "yoga-wasm-web": "^0.3.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/ratelimiter": "^3.4.6",
     "ts-node": "^10.9.2",
     "typescript": "latest"
   }
