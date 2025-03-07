@@ -4,13 +4,12 @@ import { serve } from "@hono/node-server";
 import { neynar } from 'frog/middlewares';
 import fs from 'fs/promises';
 
-
 const cacheFile = './cache.json';
 let cache: {
   queries: Record<string, { rows: any[]; lastUpdated: number }>;
   initialFetchDone: boolean;
   updateCountToday: number;
-  lastUpdateDay: number; 
+  lastUpdateDay: number;
 } = {
   queries: {
     '4816299': { rows: [], lastUpdated: 0 },
@@ -48,8 +47,9 @@ export const app = new Frog({
   imageOptions: {
     fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }],
   },
-}).use(neynar({ apiKey: 'NEYNAR_FROG_FM', features: ['interactor', 'cast'] }));
+});
 
+app.use(neynar({ apiKey: 'NEYNAR_FROG_FM', features: ['interactor', 'cast'] }));
 app.use('/*', serveStatic({ root: './public' }));
 
 async function fetchQueryResult(queryId: string) {
@@ -111,7 +111,7 @@ function shouldUpdateApi(lastUpdated: number) {
   const currentDay = getCurrentUTCDay();
   const isNewDay = lastUpdated < currentDay;
 
-  const updateTimes = [180, 540, 900, 1080, 1260];
+  const updateTimes = [180, 540, 900, 1080, 1260]; // ۳:۰۰، ۹:۰۰، ۱۵:۰۰، ۱۸:۰۰، ۲۱:۰۰ UTC
   const isUpdateTime = updateTimes.some(time => Math.abs(totalMinutes - time) <= 5);
 
   console.log(`[UpdateCheck] Time: ${totalMinutes} min (${utcHours}:${utcMinutes} UTC), Last Updated: ${new Date(lastUpdated).toUTCString()}, New Day: ${isNewDay}, Update Time: ${isUpdateTime}`);
@@ -193,11 +193,23 @@ function getUserDataFromCache(fid: string) {
 
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
-  console.log('[Frame] Parsing URL parameters');
+  console.log('[Frame] User-Agent:', c.req.header('user-agent'));
+
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
-  const fid = urlParams.get("fid") || (c.var as any)?.interactor?.fid || "N/A";
-  const username = urlParams.get("username") || (c.var as any)?.interactor?.username || "Unknown";
-  const pfpUrl = urlParams.get("pfpUrl") || (c.var as any)?.interactor?.pfpUrl || "";
+  console.log('[Frame] URL Params:', urlParams.toString());
+
+  console.log('[Frame] c.var:', JSON.stringify(c.var, null, 2));
+
+  const defaultInteractor = {
+    fid: "N/A",
+    username: "Unknown",
+    pfpUrl: ""
+  };
+  const interactor = (c.var as any)?.interactor ?? defaultInteractor;
+
+  const fid = urlParams.get("fid") || interactor.fid || "N/A";
+  const username = urlParams.get("username") || interactor.username || "Unknown";
+  const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
   console.log(`[Frame] FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
 
   console.log('[Frame] Calling updateCache');
@@ -207,8 +219,8 @@ app.frame('/', async (c) => {
   console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
   console.log('[Frame] User data fetched');
-  console.log(`sentPeanutCount ${sentPeanutCount}`);
-  console.log('[Frame] Generating hashId');
+  console.log('[Frame] User data fetched');
+  console.log('sentPeanutCount',sentPeanutCount);
   const hashId = await getOrGenerateHashId(fid);
   console.log('[Frame] Building frame URL');
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
@@ -220,7 +232,7 @@ app.frame('/', async (c) => {
   console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
 
   console.log('[Frame] Building response');
-  const response = c.res({
+  return c.res({
     image: (
       <div style={{
         display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
@@ -253,8 +265,6 @@ app.frame('/', async (c) => {
       <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
     ],
   });
-  console.log('[Frame] Response built');
-  return response;
 });
 
 const port = process.env.PORT || 3000;
