@@ -153,7 +153,7 @@ function shouldUpdateApi(lastUpdated: number) {
   const currentDay = getCurrentUTCDay();
   const isNewDay = lastUpdated < currentDay;
 
-  const updateTimes = [180, 540, 605, 1080, 1260];
+  const updateTimes = [180, 540, 605, 1090, 1260];
   const isUpdateTime = updateTimes.some(time => Math.abs(totalMinutes - time) <= 5);
 
   console.log(`[UpdateCheck] Time: ${totalMinutes} min (${utcHours}:${utcMinutes} UTC), Last Updated: ${new Date(lastUpdated).toUTCString()}, New Day: ${isNewDay}, Update Time: ${isUpdateTime}`);
