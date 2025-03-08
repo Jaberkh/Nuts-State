@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "frog vercel-build",
     "dev": "frog dev",
-  "start": "npm run dev"
+    "deploy": "vercel"
   },
   "dependencies": {
     "@hono/node-server": "latest",
@@ -22,6 +23,7 @@
     "@types/node": "^22.10.2",
     "@types/ratelimiter": "^3.4.6",
     "ts-node": "^10.9.2",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vercel": "^41.3.2"
   }
 }
