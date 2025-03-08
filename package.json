@@ -4,17 +4,17 @@
   "type": "module",
   "scripts": {
     "dev": "frog dev",
-    "build": "tsc && frog build",
-    "start": "frog dev"
-}
-,
+  "start": "npm run dev"
+  },
   "dependencies": {
     "@hono/node-server": "latest",
     "dotenv": "^16.4.7",
-    "frog": "^0.18.3",
+    "frog": "^0.18.2",
     "hashids": "^2.3.0",
     "hono": "^4",
     "ratelimiter": "^3.4.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "satori": "^0.12.1",
     "yoga-wasm-web": "^0.3.3"
   },

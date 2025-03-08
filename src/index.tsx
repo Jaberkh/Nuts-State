@@ -22,21 +22,32 @@ let cache: {
   lastUpdateDay: 0
 };
 
-const requestTimestamps: number[] = [];
-const MAX_REQUESTS = 30;
-const DURATION = 60000; // 60 ثانیه
+const secondTimestamps: number[] = [];
+const minuteTimestamps: number[] = [];
+const MAX_RPS = 5;
+const MAX_RPM = 300;
+const SECOND_DURATION = 1000;
+const MINUTE_DURATION = 60000;
 
 function checkRateLimit(): boolean {
   const now = Date.now();
-  while (requestTimestamps.length > 0 && now - requestTimestamps[0] > DURATION) {
-    requestTimestamps.shift();
+  while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
+    secondTimestamps.shift();
   }
-  if (requestTimestamps.length >= MAX_REQUESTS) {
-    console.log('[RateLimit] Too many requests. Remaining:', MAX_REQUESTS - requestTimestamps.length);
+  if (secondTimestamps.length >= MAX_RPS) {
+    console.log('[RateLimit] Too many requests per second. Remaining:', MAX_RPS - secondTimestamps.length);
     return false;
   }
-  requestTimestamps.push(now);
-  console.log('[RateLimit] Allowed. Remaining:', MAX_REQUESTS - requestTimestamps.length);
+  while (minuteTimestamps.length > 0 && now - minuteTimestamps[0] > MINUTE_DURATION) {
+    minuteTimestamps.shift();
+  }
+  if (minuteTimestamps.length >= MAX_RPM) {
+    console.log('[RateLimit] Too many requests per minute. Remaining:', MAX_RPM - minuteTimestamps.length);
+    return false;
+  }
+  secondTimestamps.push(now);
+  minuteTimestamps.push(now);
+  console.log('[RateLimit] Allowed. RPS Remaining:', MAX_RPS - secondTimestamps.length, 'RPM Remaining:', MAX_RPM - minuteTimestamps.length);
   return true;
 }
 
@@ -67,10 +78,7 @@ export const app = new Frog({
   },
 });
 
-app.use(neynar({
-  apiKey: 'NEYNAR_FROG_FM',
-  features: []
-}));
+app.use(neynar({ apiKey: 'NEYNAR_FROG_FM', features: ['interactor', 'cast'] }));
 app.use('/*', serveStatic({ root: './public' }));
 
 async function fetchQueryResult(queryId: string) {
@@ -81,13 +89,14 @@ async function fetchQueryResult(queryId: string) {
       method: 'GET',
       headers: { 'X-Dune-API-Key': 'RhjCYVQmxhjppZqg7Z8DUWwpyFpjPYf4' }
     });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     console.log('[API] Response received');
     const data = await response.json();
     const results = data?.result?.rows || [];
     console.log(`[API] Fetched ${results.length} rows for Query ${queryId}`);
     return results;
-  } catch (error) {
-    console.error(`[API] Error fetching Query ${queryId}:`, error);
+  } catch (error: unknown) {
+    console.error(`[API] Error fetching Query ${queryId}:`, (error instanceof Error ? error.message : 'Unknown error'));
     return [];
   }
 }
@@ -193,20 +202,16 @@ async function updateCache() {
 
 function getUserDataFromCache(fid: string) {
   console.log(`[Data] Fetching data from cache for FID ${fid}`);
-  const todayPeanutCountRow = cache.queries['4816299'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid);
-  console.log(`[Data] Today row found: ${todayPeanutCountRow ? 'yes' : 'no'}`);
-  const totalPeanutCountRow = cache.queries['4815993'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid);
-  console.log(`[Data] Total row found: ${totalPeanutCountRow ? 'yes' : 'no'}`);
-  const sentPeanutCountRow = cache.queries['4811780'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid);
-  console.log(`[Data] Sent row found: ${sentPeanutCountRow ? 'yes' : 'no'}`);
-  const userRankRow = cache.queries['4801919'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid);
-  console.log(`[Data] Rank row found: ${userRankRow ? 'yes' : 'no'}`);
+  const todayPeanutCountRow = cache.queries['4816299'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
+  const totalPeanutCountRow = cache.queries['4815993'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
+  const sentPeanutCountRow = cache.queries['4811780'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
+  const userRankRow = cache.queries['4801919'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
 
-  const todayPeanutCount = todayPeanutCountRow?.peanut_count || 0;
-  const totalPeanutCount = totalPeanutCountRow?.total_peanut_count || 0;
-  const sentPeanutCount = sentPeanutCountRow?.sent_peanut_count || 0;
-  const remainingAllowance = Math.max(30 - (sentPeanutCountRow?.sent_peanut_count || 0), 0);
-  const userRank = userRankRow?.rank || 0;
+  const todayPeanutCount = todayPeanutCountRow.peanut_count || 0;
+  const totalPeanutCount = totalPeanutCountRow.total_peanut_count || 0;
+  const sentPeanutCount = sentPeanutCountRow.sent_peanut_count || 0;
+  const remainingAllowance = Math.max(30 - (sentPeanutCountRow.sent_peanut_count || 0), 0);
+  const userRank = userRankRow.rank || 0;
 
   console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}`);
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank };
@@ -220,7 +225,7 @@ app.frame('/', async (c) => {
     return c.res({
       image: (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
-          <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Too many requests. Wait a minute.</p>
+          <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Too many requests. Wait a moment.</p>
         </div>
       ),
       intents: [<Button value="my_state">Try Again</Button>]
@@ -230,13 +235,7 @@ app.frame('/', async (c) => {
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
   console.log('[Frame] URL Params:', urlParams.toString());
 
-  console.log('[Frame] c.var:', JSON.stringify(c.var, null, 2));
-
-  const defaultInteractor = {
-    fid: "N/A",
-    username: "Unknown",
-    pfpUrl: ""
-  };
+  const defaultInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
   const interactor = (c.var as any)?.interactor ?? defaultInteractor;
 
   const fid = urlParams.get("fid") || interactor.fid || "N/A";
@@ -251,7 +250,6 @@ app.frame('/', async (c) => {
   console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
   console.log('[Frame] User data fetched');
-  console.log(`[Frame] Data - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}`);
 
   console.log('[Frame] Generating hashId');
   const hashId = await getOrGenerateHashId(fid);
@@ -265,13 +263,12 @@ app.frame('/', async (c) => {
   console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
 
   try {
-    console.log('[Frame] Preparing to render image with:', { fid, username, pfpUrl, todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank });
-
+    console.log('[Frame] Rendering image');
     return c.res({
       image: (
         <div style={{
           display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/770/574027986_bg.png)',
+          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/724/573425032_bg.png)',
           backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
           textAlign: 'center', position: 'relative'
         }}>
@@ -288,10 +285,10 @@ app.frame('/', async (c) => {
             color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
             FID: {fid || 'N/A'}
           </p>
-          <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount || 0)}</p>
-          <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount || 0)}</p>
-          <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance || 0)}</p>
-          <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank || 0)}</p>
+          <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
+          <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
         </div>
       ),
       intents: [
@@ -300,13 +297,12 @@ app.frame('/', async (c) => {
         <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
       ],
     });
-  } catch (error) {
-    console.error('[Frame] Render error:', error);
-    console.error('[Frame] Failed with inputs:', { fid, username, pfpUrl, todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank });
+  } catch (error: unknown) {
+    console.error('[Frame] Render error:', (error instanceof Error ? error.message : 'Unknown error'));
     return c.res({
       image: (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
-          <p style={{ color: '#ff0000', fontSize: '30px' }}>Error rendering frame. Please try again later.</p>
+          <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Error rendering frame. Please try again.</p>
         </div>
       ),
       intents: [<Button value="my_state">Try Again</Button>]
