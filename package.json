@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "frog dev",
-    "build": "tsc",
-    "start": "node build/index.js"
-  },
+ "dev": "frog dev",
+  "build": "tsc && frog build",
+  "start": "frog dev"
+}
+,
   "dependencies": {
     "@hono/node-server": "latest",
     "dotenv": "^16.4.7",
