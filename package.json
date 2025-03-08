@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
- "dev": "frog dev",
-  "build": "tsc && frog build",
-  "start": "frog dev"
+    "dev": "frog dev",
+    "build": "tsc && frog build",
+    "start": "frog dev"
 }
 ,
   "dependencies": {
