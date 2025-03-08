@@ -67,7 +67,10 @@ export const app = new Frog({
   },
 });
 
-app.use(neynar({ apiKey: 'NEYNAR_FROG_FM', features: ['interactor', 'cast'] }));
+app.use(neynar({
+  apiKey: 'NEYNAR_FROG_FM',
+  features: []
+}));
 app.use('/*', serveStatic({ root: './public' }));
 
 async function fetchQueryResult(queryId: string) {
@@ -268,7 +271,7 @@ app.frame('/', async (c) => {
       image: (
         <div style={{
           display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/724/573425032_bg.png)',
+          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/770/574027986_bg.png)',
           backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
           textAlign: 'center', position: 'relative'
         }}>
