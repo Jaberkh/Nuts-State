@@ -56,7 +56,6 @@ async function loadCache() {
   try {
     const data = await fs.readFile(cacheFile, 'utf8');
     const loadedCache = JSON.parse(data);
-    // فقط مقادیری که انتظار داریم رو بارگذاری می‌کنیم
     cache = {
       queries: {
         '4810732': loadedCache.queries['4810732'] || { rows: [], lastUpdated: 0 },
@@ -153,7 +152,7 @@ function shouldUpdateApi(lastUpdated: number) {
   const currentDay = getCurrentUTCDay();
   const isNewDay = lastUpdated < currentDay;
 
-  const updateTimes = [180, 540, 605, 1090, 1260];
+  const updateTimes = [180, 540, 605, 1097, 1260];
   const isUpdateTime = updateTimes.some(time => Math.abs(totalMinutes - time) <= 5);
 
   console.log(`[UpdateCheck] Time: ${totalMinutes} min (${utcHours}:${utcMinutes} UTC), Last Updated: ${new Date(lastUpdated).toUTCString()}, New Day: ${isNewDay}, Update Time: ${isUpdateTime}`);
@@ -164,16 +163,7 @@ async function updateCache() {
   console.log('[Cache] Entering updateCache');
   const now = Date.now();
   const currentDay = getCurrentUTCDay();
-
-  // چک کردن اینکه آیا کلیدها وجود دارن و مقداردهی پیش‌فرض اگه نباشن
-  const queryIds = ['4810732', '4815993', '4811780', '4801919'];
-  for (const queryId of queryIds) {
-    if (!cache.queries[queryId]) {
-      cache.queries[queryId] = { rows: [], lastUpdated: 0 };
-    }
-  }
-
-  const lastUpdated = cache.queries['4810732'].lastUpdated; // از دیلی استفاده می‌کنیم
+  const lastUpdated = cache.queries['4810732'].lastUpdated || 0;
 
   console.log(`[Cache] Last updated: ${new Date(lastUpdated).toUTCString()}, Initial Fetch Done: ${cache.initialFetchDone}, Update Count: ${cache.updateCountToday}, Last Update Day: ${new Date(cache.lastUpdateDay).toUTCString()}`);
 
@@ -188,36 +178,27 @@ async function updateCache() {
     return;
   }
 
-  if (!cache.initialFetchDone) {
-    console.log(`[Cache] First request. Forcing update at ${new Date().toUTCString()}`);
-    for (const queryId of queryIds) {
-      const rows = await fetchQueryResult(queryId);
-      cache.queries[queryId] = { rows, lastUpdated: now };
-      console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
-    }
-    cache.initialFetchDone = true;
-    cache.updateCountToday += 1;
-    cache.lastUpdateDay = currentDay;
-    await saveCache();
-    console.log('[Cache] Initial fetch completed');
-    return;
-  }
-
   if (!shouldUpdateApi(lastUpdated)) {
     console.log('[Cache] Not an update time or already updated. Using existing cache');
     return;
   }
 
-  console.log(`[Cache] Scheduled update at ${new Date().toUTCString()}`);
+  console.log(`[Cache] Fetching new data and resetting cache at ${new Date().toUTCString()}`);
+  const queryIds = ['4810732', '4815993', '4811780', '4801919'];
+
+  // پاک کردن داده‌های قدیمی و گرفتن داده‌های جدید
   for (const queryId of queryIds) {
     const rows = await fetchQueryResult(queryId);
     cache.queries[queryId] = { rows, lastUpdated: now };
     console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
   }
+
+  // آپدیت وضعیت کش
+  cache.initialFetchDone = true;
   cache.updateCountToday += 1;
   cache.lastUpdateDay = currentDay;
   await saveCache();
-  console.log('[Cache] Scheduled update completed');
+  console.log('[Cache] Cache updated with fresh data');
 }
 
 function getUserDataFromCache(fid: string) {
