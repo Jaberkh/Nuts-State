@@ -12,10 +12,10 @@ let cache: {
   lastUpdateDay: number;
 } = {
   queries: {
-    '4816299': { rows: [], lastUpdated: 0 },
-    '4815993': { rows: [], lastUpdated: 0 },
-    '4811780': { rows: [], lastUpdated: 0 },
-    '4801919': { rows: [], lastUpdated: 0 }
+    '4810732': { rows: [], lastUpdated: 0 }, // دیلی
+    '4815993': { rows: [], lastUpdated: 0 }, // توتال ناتس
+    '4811780': { rows: [], lastUpdated: 0 }, // الوانس
+    '4801919': { rows: [], lastUpdated: 0 }  // لیدربرد
   },
   initialFetchDone: false,
   updateCountToday: 0,
@@ -55,10 +55,22 @@ async function loadCache() {
   console.log('[Cache] Loading cache from file');
   try {
     const data = await fs.readFile(cacheFile, 'utf8');
-    cache = JSON.parse(data);
+    const loadedCache = JSON.parse(data);
+    // فقط مقادیری که انتظار داریم رو بارگذاری می‌کنیم
+    cache = {
+      queries: {
+        '4810732': loadedCache.queries['4810732'] || { rows: [], lastUpdated: 0 },
+        '4815993': loadedCache.queries['4815993'] || { rows: [], lastUpdated: 0 },
+        '4811780': loadedCache.queries['4811780'] || { rows: [], lastUpdated: 0 },
+        '4801919': loadedCache.queries['4801919'] || { rows: [], lastUpdated: 0 }
+      },
+      initialFetchDone: loadedCache.initialFetchDone || false,
+      updateCountToday: loadedCache.updateCountToday || 0,
+      lastUpdateDay: loadedCache.lastUpdateDay || 0
+    };
     console.log(`[Cache] Loaded: initialFetchDone=${cache.initialFetchDone}, updateCountToday=${cache.updateCountToday}, lastUpdateDay=${new Date(cache.lastUpdateDay).toUTCString()}`);
   } catch (error) {
-    console.log('[Cache] No cache file found. Starting fresh');
+    console.log('[Cache] No cache file found or invalid JSON. Starting fresh');
   }
 }
 
@@ -151,8 +163,18 @@ function shouldUpdateApi(lastUpdated: number) {
 async function updateCache() {
   console.log('[Cache] Entering updateCache');
   const now = Date.now();
-  const lastUpdated = cache.queries['4816299'].lastUpdated;
   const currentDay = getCurrentUTCDay();
+
+  // چک کردن اینکه آیا کلیدها وجود دارن و مقداردهی پیش‌فرض اگه نباشن
+  const queryIds = ['4810732', '4815993', '4811780', '4801919'];
+  for (const queryId of queryIds) {
+    if (!cache.queries[queryId]) {
+      cache.queries[queryId] = { rows: [], lastUpdated: 0 };
+    }
+  }
+
+  const lastUpdated = cache.queries['4810732'].lastUpdated; // از دیلی استفاده می‌کنیم
+
   console.log(`[Cache] Last updated: ${new Date(lastUpdated).toUTCString()}, Initial Fetch Done: ${cache.initialFetchDone}, Update Count: ${cache.updateCountToday}, Last Update Day: ${new Date(cache.lastUpdateDay).toUTCString()}`);
 
   if (cache.lastUpdateDay < currentDay) {
@@ -168,7 +190,6 @@ async function updateCache() {
 
   if (!cache.initialFetchDone) {
     console.log(`[Cache] First request. Forcing update at ${new Date().toUTCString()}`);
-    const queryIds = ['4816299', '4815993', '4811780', '4801919'];
     for (const queryId of queryIds) {
       const rows = await fetchQueryResult(queryId);
       cache.queries[queryId] = { rows, lastUpdated: now };
@@ -188,10 +209,9 @@ async function updateCache() {
   }
 
   console.log(`[Cache] Scheduled update at ${new Date().toUTCString()}`);
-  const queryIds = ['4816299', '4815993', '4811780', '4801919'];
   for (const queryId of queryIds) {
     const rows = await fetchQueryResult(queryId);
-    cache.queries[queryId] = { rows, lastUpdated: now }; // کَش هم‌زمان با API آپدیت می‌شه
+    cache.queries[queryId] = { rows, lastUpdated: now };
     console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
   }
   cache.updateCountToday += 1;
@@ -202,7 +222,7 @@ async function updateCache() {
 
 function getUserDataFromCache(fid: string) {
   console.log(`[Data] Fetching data from cache for FID ${fid}`);
-  const todayPeanutCountRow = cache.queries['4816299'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
+  const todayPeanutCountRow = cache.queries['4810732'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
   const totalPeanutCountRow = cache.queries['4815993'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
   const sentPeanutCountRow = cache.queries['4811780'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
   const userRankRow = cache.queries['4801919'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
