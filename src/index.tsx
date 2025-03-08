@@ -141,7 +141,7 @@ function shouldUpdateApi(lastUpdated: number) {
   const currentDay = getCurrentUTCDay();
   const isNewDay = lastUpdated < currentDay;
 
-  const updateTimes = [180, 540, 900, 1080, 1260];
+  const updateTimes = [180, 540, 605, 1080, 1260];
   const isUpdateTime = updateTimes.some(time => Math.abs(totalMinutes - time) <= 5);
 
   console.log(`[UpdateCheck] Time: ${totalMinutes} min (${utcHours}:${utcMinutes} UTC), Last Updated: ${new Date(lastUpdated).toUTCString()}, New Day: ${isNewDay}, Update Time: ${isUpdateTime}`);
@@ -183,7 +183,7 @@ async function updateCache() {
   }
 
   if (!shouldUpdateApi(lastUpdated)) {
-    console.log('[Cache] Not an update time or already updated. Skipping');
+    console.log('[Cache] Not an update time or already updated. Using existing cache');
     return;
   }
 
@@ -191,7 +191,7 @@ async function updateCache() {
   const queryIds = ['4816299', '4815993', '4811780', '4801919'];
   for (const queryId of queryIds) {
     const rows = await fetchQueryResult(queryId);
-    cache.queries[queryId] = { rows, lastUpdated: now };
+    cache.queries[queryId] = { rows, lastUpdated: now }; // کَش هم‌زمان با API آپدیت می‌شه
     console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
   }
   cache.updateCountToday += 1;
