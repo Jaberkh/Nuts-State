@@ -24,9 +24,9 @@ let cache: {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 5;           // حداکثر درخواست در ثانیه
-const MAX_RPM = 300;         // حداکثر درخواست در دقیقه
-const LOAD_THRESHOLD = 4;    // آستانه لودینگ (نزدیک شدن به سقف درخواست در ثانیه)
+const MAX_RPS = 3;           // حداکثر درخواست در ثانیه (از 5 به 3 کاهش یافت)
+const MAX_RPM = 180;         // حداکثر درخواست در دقیقه (از 300 به 180 کاهش یافت)
+const LOAD_THRESHOLD = 2;    // آستانه لودینگ (از 4 به 2 کاهش یافت)
 const SECOND_DURATION = 1000;
 const MINUTE_DURATION = 60000;
 
@@ -325,7 +325,7 @@ app.frame('/', async (c) => {
             textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username || 'Unknown'}</p>
           <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
             color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
-            FID: {fid || 'N/A'}
+            FID: ${fid || 'N/A'}
           </p>
           <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
           <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
