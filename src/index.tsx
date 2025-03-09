@@ -24,31 +24,42 @@ let cache: {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 5;
-const MAX_RPM = 300;
+const MAX_RPS = 5;           // حداکثر درخواست در ثانیه
+const MAX_RPM = 300;         // حداکثر درخواست در دقیقه
+const LOAD_THRESHOLD = 4;    // آستانه لودینگ (نزدیک شدن به سقف درخواست در ثانیه)
 const SECOND_DURATION = 1000;
 const MINUTE_DURATION = 60000;
 
-function checkRateLimit(): boolean {
+function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   const now = Date.now();
+
+  // پاکسازی درخواست‌های قدیمی ثانیه
   while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
     secondTimestamps.shift();
   }
-  if (secondTimestamps.length >= MAX_RPS) {
-    console.log('[RateLimit] Too many requests per second. Remaining:', MAX_RPS - secondTimestamps.length);
-    return false;
-  }
+  
+  // پاکسازی درخواست‌های قدیمی دقیقه
   while (minuteTimestamps.length > 0 && now - minuteTimestamps[0] > MINUTE_DURATION) {
     minuteTimestamps.shift();
   }
-  if (minuteTimestamps.length >= MAX_RPM) {
-    console.log('[RateLimit] Too many requests per minute. Remaining:', MAX_RPM - minuteTimestamps.length);
-    return false;
+
+  // بررسی سقف درخواست‌ها
+  if (secondTimestamps.length >= MAX_RPS || minuteTimestamps.length >= MAX_RPM) {
+    console.log('[RateLimit] Too many requests. RPS:', secondTimestamps.length, 'RPM:', minuteTimestamps.length);
+    return { isAllowed: false, isLoading: false }; // رد درخواست
   }
+
+  // بررسی حالت لودینگ (نزدیک شدن به سقف)
+  if (secondTimestamps.length >= LOAD_THRESHOLD) {
+    console.log('[RateLimit] Approaching limit. Switching to loading state. RPS:', secondTimestamps.length);
+    return { isAllowed: true, isLoading: true }; // اجازه درخواست اما نمایش لودینگ
+  }
+
+  // ثبت درخواست جدید
   secondTimestamps.push(now);
   minuteTimestamps.push(now);
   console.log('[RateLimit] Allowed. RPS Remaining:', MAX_RPS - secondTimestamps.length, 'RPM Remaining:', MAX_RPM - minuteTimestamps.length);
-  return true;
+  return { isAllowed: true, isLoading: false }; // اجازه درخواست عادی
 }
 
 async function loadCache() {
@@ -237,11 +248,26 @@ app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
   console.log('[Frame] User-Agent:', c.req.header('user-agent'));
 
-  if (!checkRateLimit()) {
+  const rateLimitStatus = checkRateLimit();
+
+  // اگر درخواست رد شده باشد
+  if (!rateLimitStatus.isAllowed) {
     return c.res({
       image: (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
           <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Too many requests. Wait a moment.</p>
+        </div>
+      ),
+      intents: [<Button value="my_state">Try Again</Button>]
+    });
+  }
+
+  // اگر نزدیک به سقف باشیم، حالت لودینگ نمایش داده شود
+  if (rateLimitStatus.isLoading) {
+    return c.res({
+      image: (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#fff3cd' }}>
+          <p style={{ color: '#856404', fontSize: '30px', fontFamily: 'Poetsen One' }}>Loading... Please wait.</p>
         </div>
       ),
       intents: [<Button value="my_state">Try Again</Button>]
