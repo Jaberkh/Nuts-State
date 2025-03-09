@@ -22,19 +22,23 @@ let cache: {
   lastUpdateDay: 0
 };
 
-// سیستم صف برای مدیریت درخواست‌ها
+// سیستم صف با ظرفیت بیشتر
 const requestQueue: Array<{ resolve: (value: any) => void, reject: (reason?: any) => void }> = [];
 let isProcessingQueue = false;
-const MAX_CONCURRENT = 2; // حداکثر درخواست‌های همزمان
+const MAX_CONCURRENT = 5; // افزایش به 5 درخواست همزمان
+const QUEUE_DELAY = 100;  // کاهش تاخیر به 100 میلی‌ثانیه
 
 async function processQueue() {
   if (isProcessingQueue || requestQueue.length === 0) return;
   isProcessingQueue = true;
 
   while (requestQueue.length > 0) {
-    const { resolve } = requestQueue.shift()!;
-    resolve(true); // اجازه پردازش درخواست
-    await new Promise(resolve => setTimeout(resolve, 200)); // تاخیر 200 میلی‌ثانیه بین هر درخواست
+    const batch = requestQueue.splice(0, MAX_CONCURRENT); // پردازش دسته‌ای
+    const promises = batch.map(({ resolve }) => {
+      resolve(true);
+      return new Promise(res => setTimeout(res, QUEUE_DELAY));
+    });
+    await Promise.all(promises); // صبر برای اتمام دسته
   }
 
   isProcessingQueue = false;
@@ -49,8 +53,8 @@ function enqueueRequest(): Promise<boolean> {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 5;           // برگشت به مقدار اولیه
-const MAX_RPM = 300;         // برگشت به مقدار اولیه
+const MAX_RPS = 5;
+const MAX_RPM = 300;
 const SECOND_DURATION = 1000;
 const MINUTE_DURATION = 60000;
 
