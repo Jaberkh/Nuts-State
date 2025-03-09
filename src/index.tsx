@@ -25,8 +25,8 @@ let cache: {
 // سیستم صف با ظرفیت بیشتر
 const requestQueue: Array<{ resolve: (value: any) => void, reject: (reason?: any) => void }> = [];
 let isProcessingQueue = false;
-const MAX_CONCURRENT = 5; // افزایش به 5 درخواست همزمان
-const QUEUE_DELAY = 100;  // کاهش تاخیر به 100 میلی‌ثانیه
+const MAX_CONCURRENT = 3; // افزایش به 5 درخواست همزمان
+const QUEUE_DELAY = 150;  // کاهش تاخیر به 100 میلی‌ثانیه
 
 async function processQueue() {
   if (isProcessingQueue || requestQueue.length === 0) return;
