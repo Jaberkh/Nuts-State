@@ -4,30 +4,6 @@ import { serve } from "@hono/node-server";
 import { neynar } from 'frog/middlewares';
 import fs from 'fs/promises';
 
-// سیستم صف برای مدیریت درخواست‌ها
-const requestQueue: Array<() => Promise<void>> = [];
-let isProcessingQueue = false;
-
-async function processQueue() {
-  if (isProcessingQueue || requestQueue.length === 0) return;
-  isProcessingQueue = true;
-  
-  while (requestQueue.length > 0) {
-    const task = requestQueue.shift();
-    if (task) {
-      try {
-        await task();
-      } catch (error) {
-        console.error('[Queue] Error processing task:', error);
-      }
-      // تأخیر کوتاه برای کاهش فشار روی سرور
-      await new Promise(resolve => setTimeout(resolve, 200)); // 200ms تأخیر بین هر درخواست
-    }
-  }
-  
-  isProcessingQueue = false;
-}
-
 const cacheFile = './cache.json';
 let cache: {
   queries: Record<string, { rows: any[]; lastUpdated: number }>;
@@ -45,6 +21,48 @@ let cache: {
   updateCountToday: 0,
   lastUpdateDay: 0
 };
+
+const secondTimestamps: number[] = [];
+const minuteTimestamps: number[] = [];
+const MAX_RPS = 3;           // حداکثر درخواست در ثانیه (کاهش به 3 برای لیمیت سرور)
+const MAX_RPM = 180;         // حداکثر درخواست در دقیقه (3 × 60)
+const LOAD_THRESHOLD = 2;    // آستانه لودینگ (نزدیک شدن به سقف درخواست در ثانیه)
+const SECOND_DURATION = 1000;
+const MINUTE_DURATION = 60000;
+
+function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
+  const now = Date.now();
+
+  // پاکسازی درخواست‌های قدیمی ثانیه
+  while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
+    secondTimestamps.shift();
+  }
+
+  // پاکسازی درخواست‌های قدیمی دقیقه
+
+
+  while (minuteTimestamps.length > 0 && now - minuteTimestamps[0] > MINUTE_DURATION) {
+    minuteTimestamps.shift();
+  }
+
+  // بررسی سقف درخواست‌ها
+  if (secondTimestamps.length >= MAX_RPS || minuteTimestamps.length >= MAX_RPM) {
+    console.log('[RateLimit] Too many requests. RPS:', secondTimestamps.length, 'RPM:', minuteTimestamps.length);
+    return { isAllowed: false, isLoading: false }; // رد درخواست
+  }
+
+  // بررسی حالت لودینگ (نزدیک شدن به سقف)
+  if (secondTimestamps.length >= LOAD_THRESHOLD) {
+    console.log('[RateLimit] Approaching limit. Switching to loading state. RPS:', secondTimestamps.length);
+    return { isAllowed: true, isLoading: true }; // اجازه درخواست اما نمایش لودینگ
+  }
+
+  // ثبت درخواست جدید
+  secondTimestamps.push(now);
+  minuteTimestamps.push(now);
+  console.log('[RateLimit] Allowed. RPS Remaining:', MAX_RPS - secondTimestamps.length, 'RPM Remaining:', MAX_RPM - minuteTimestamps.length);
+  return { isAllowed: true, isLoading: false }; // اجازه درخواست عادی
+}
 
 async function loadCache() {
   console.log('[Cache] Loading cache from file');
@@ -232,104 +250,109 @@ app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
   console.log('[Frame] User-Agent:', c.req.header('user-agent'));
 
-  // اضافه کردن درخواست به صف و برگردوندن پاسخ
-  return new Promise((resolve) => {
-    requestQueue.push(async () => {
-      const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
-      console.log('[Frame] URL Params:', urlParams.toString());
+  const rateLimitStatus = checkRateLimit();
 
-      const defaultInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
-      const interactor = (c.var as any)?.interactor ?? defaultInteractor;
-
-      const fid = urlParams.get("fid") || interactor.fid || "N/A";
-      const username = urlParams.get("username") || interactor.username || "Unknown";
-      const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
-      console.log(`[Frame] FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
-
-      console.log('[Frame] Calling updateCache');
-      await updateCache();
-      console.log('[Frame] updateCache completed');
-
-      console.log('[Frame] Fetching user data from cache');
-      const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
-      console.log('[Frame] User data fetched');
-
-      console.log('[Frame] Generating hashId');
-      const hashId = await getOrGenerateHashId(fid);
-      console.log('[Frame] Building frame URL');
-      const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
-      console.log(`[Frame] Generated frameUrl: ${frameUrl}`);
-      console.log('[Frame] Building compose URL');
-      const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
-        `Check out your 🥜 stats! \n\n Frame by @arsalang75523 & @jeyloo.eth `
-      )}&embeds[]=${encodeURIComponent(frameUrl)}`;
-      console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
-
-      try {
-        console.log('[Frame] Rendering image');
-        const response = c.res({
-          image: (
-            <div style={{
-              display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-              width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/761/573945608_bg.png)',
-              backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-              textAlign: 'center', position: 'relative'
-            }}>
-              {pfpUrl && typeof pfpUrl === 'string' && pfpUrl.length > 0 && (
-                <img src={pfpUrl} alt="Profile Picture" style={{
-                  width: '230px', height: '230px', borderRadius: '50%', position: 'absolute',
-                  top: '22%', left: '12%', transform: 'translate(-50%, -50%)', border: '3px solid white'
-                }} />
-              )}
-              <p style={{ position: 'absolute', top: '15%', left: '60%', transform: 'translate(-50%, -50%)',
-                color: 'white', fontSize: '52px', fontWeight: 'bold', fontFamily: 'Poetsen One',
-                textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username || 'Unknown'}</p>
-              <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
-                color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
-                FID: {fid || 'N/A'}
-              </p>
-              <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
-              <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
-              <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
-              <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
-            </div>
-          ),
-          intents: [
-            <Button value="my_state">My State</Button>,
-            <Button.Link href={composeCastUrl}>Share</Button.Link>,
-            <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
-          ],
-        });
-        resolve(response);
-      } catch (error: unknown) {
-        console.error('[Frame] Render error:', (error instanceof Error ? error.message : 'Unknown error'));
-        const errorResponse = c.res({
-          image: (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
-              <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Error rendering frame. Please try again.</p>
-            </div>
-          ),
-          intents: [<Button value="my_state">Try Again</Button>]
-        });
-        resolve(errorResponse);
-      }
-    });
-
-    // شروع پردازش صف
-    processQueue();
-
-    // پاسخ موقت تا وقتی درخواست پردازش بشه
-    resolve(c.res({
+  // اگر درخواست رد شده باشد
+  if (!rateLimitStatus.isAllowed) {
+    return c.res({
       image: (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#fff3cd' }}>
-          <p style={{ color: '#856404', fontSize: '30px', fontFamily: 'Poetsen One' }}>Processing... Please wait.</p>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
+          <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Too many requests. Wait a moment.</p>
         </div>
       ),
       intents: [<Button value="my_state">Try Again</Button>]
-    }));
-  });
+    });
+  }
+
+  // اگر نزدیک به سقف باشیم، حالت لودینگ نمایش داده شود
+  if (rateLimitStatus.isLoading) {
+    return c.res({
+      image: (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#fff3cd' }}>
+          <p style={{ color: '#856404', fontSize: '30px', fontFamily: 'Poetsen One' }}>Loading... Please wait.</p>
+        </div>
+      ),
+      intents: [<Button value="my_state">Try Again</Button>]
+    });
+  }
+
+  const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
+  console.log('[Frame] URL Params:', urlParams.toString());
+
+  const defaultInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
+  const interactor = (c.var as any)?.interactor ?? defaultInteractor;
+
+  const fid = urlParams.get("fid") || interactor.fid || "N/A";
+  const username = urlParams.get("username") || interactor.username || "Unknown";
+  const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
+  console.log(`[Frame] FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
+
+  console.log('[Frame] Calling updateCache');
+  await updateCache();
+  console.log('[Frame] updateCache completed');
+
+  console.log('[Frame] Fetching user data from cache');
+  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
+  console.log('[Frame] User data fetched');
+
+  console.log('[Frame] Generating hashId');
+  const hashId = await getOrGenerateHashId(fid);
+  console.log('[Frame] Building frame URL');
+  const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
+  console.log(`[Frame] Generated frameUrl: ${frameUrl}`);
+  console.log('[Frame] Building compose URL');
+  const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
+    `Check out your 🥜 stats! \n\n Frame by @arsalang75523 & @jeyloo.eth `
+  )}&embeds[]=${encodeURIComponent(frameUrl)}`;
+  console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
+
+  try {
+    console.log('[Frame] Rendering image');
+    return c.res({
+      image: (
+        <div style={{
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/761/573945608_bg.png)',
+          backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+          textAlign: 'center', position: 'relative'
+        }}>
+          {pfpUrl && typeof pfpUrl === 'string' && pfpUrl.length > 0 && (
+            <img src={pfpUrl} alt="Profile Picture" style={{
+              width: '230px', height: '230px', borderRadius: '50%', position: 'absolute',
+              top: '22%', left: '12%', transform: 'translate(-50%, -50%)', border: '3px solid white'
+            }} />
+          )}
+          <p style={{ position: 'absolute', top: '15%', left: '60%', transform: 'translate(-50%, -50%)',
+            color: 'white', fontSize: '52px', fontWeight: 'bold', fontFamily: 'Poetsen One',
+            textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username || 'Unknown'}</p>
+          <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
+            color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
+            FID: {fid || 'N/A'}
+          </p>
+          <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
+          <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
+        </div>
+      ),
+      intents: [
+        <Button value="my_state">My State</Button>,
+        <Button.Link href={composeCastUrl}>Share</Button.Link>,
+        <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
+      ],
+    });
+  } catch (error: unknown) {
+    console.error('[Frame] Render error:', (error instanceof Error ? error.message : 'Unknown error'));
+    return c.res({
+      image: (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
+          <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Error rendering frame. Please try again.</p>
+        </div>
+      ),
+      intents: [<Button value="my_state">Try Again</Button>]
+    });
+  }
 });
 
 const port = process.env.PORT || 3000;
 console.log(`[Server] Starting server on port ${port}`);
-serve(app);
