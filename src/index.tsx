@@ -22,44 +22,58 @@ let cache: {
   lastUpdateDay: 0
 };
 
+// سیستم صف برای مدیریت درخواست‌ها
+const requestQueue: Array<{ resolve: (value: any) => void, reject: (reason?: any) => void }> = [];
+let isProcessingQueue = false;
+const MAX_CONCURRENT = 2; // حداکثر درخواست‌های همزمان
+
+async function processQueue() {
+  if (isProcessingQueue || requestQueue.length === 0) return;
+  isProcessingQueue = true;
+
+  while (requestQueue.length > 0) {
+    const { resolve } = requestQueue.shift()!;
+    resolve(true); // اجازه پردازش درخواست
+    await new Promise(resolve => setTimeout(resolve, 200)); // تاخیر 200 میلی‌ثانیه بین هر درخواست
+  }
+
+  isProcessingQueue = false;
+}
+
+function enqueueRequest(): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ resolve, reject });
+    processQueue();
+  });
+}
+
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 3;           // حداکثر درخواست در ثانیه
-const MAX_RPM = 180;         // حداکثر درخواست در دقیقه
-const LOAD_THRESHOLD = 4;    // آستانه لودینگ (نزدیک شدن به سقف درخواست در ثانیه)
+const MAX_RPS = 5;           // برگشت به مقدار اولیه
+const MAX_RPM = 300;         // برگشت به مقدار اولیه
 const SECOND_DURATION = 1000;
 const MINUTE_DURATION = 60000;
 
-function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
+function checkRateLimit(): boolean {
   const now = Date.now();
-
-  // پاکسازی درخواست‌های قدیمی ثانیه
   while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
     secondTimestamps.shift();
   }
-  
-  // پاکسازی درخواست‌های قدیمی دقیقه
+  if (secondTimestamps.length >= MAX_RPS) {
+    console.log('[RateLimit] Too many requests per second:', secondTimestamps.length);
+    return false;
+  }
   while (minuteTimestamps.length > 0 && now - minuteTimestamps[0] > MINUTE_DURATION) {
     minuteTimestamps.shift();
   }
-
-  // بررسی سقف درخواست‌ها
-  if (secondTimestamps.length >= MAX_RPS || minuteTimestamps.length >= MAX_RPM) {
-    console.log('[RateLimit] Too many requests. RPS:', secondTimestamps.length, 'RPM:', minuteTimestamps.length);
-    return { isAllowed: false, isLoading: false }; // رد درخواست
+  if (minuteTimestamps.length >= MAX_RPM) {
+    console.log('[RateLimit] Too many requests per minute:', minuteTimestamps.length);
+    return false;
   }
-
-  // بررسی حالت لودینگ (نزدیک شدن به سقف)
-  if (secondTimestamps.length >= LOAD_THRESHOLD) {
-    console.log('[RateLimit] Approaching limit. Switching to loading state. RPS:', secondTimestamps.length);
-    return { isAllowed: true, isLoading: true }; // اجازه درخواست اما نمایش لودینگ
-  }
-
-  // ثبت درخواست جدید
   secondTimestamps.push(now);
   minuteTimestamps.push(now);
   console.log('[RateLimit] Allowed. RPS Remaining:', MAX_RPS - secondTimestamps.length, 'RPM Remaining:', MAX_RPM - minuteTimestamps.length);
-  return { isAllowed: true, isLoading: false }; // اجازه درخواست عادی
+  return true;
 }
 
 async function loadCache() {
@@ -248,26 +262,14 @@ app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
   console.log('[Frame] User-Agent:', c.req.header('user-agent'));
 
-  const rateLimitStatus = checkRateLimit();
+  // اضافه کردن درخواست به صف
+  await enqueueRequest();
 
-  // اگر درخواست رد شده باشد
-  if (!rateLimitStatus.isAllowed) {
+  if (!checkRateLimit()) {
     return c.res({
       image: (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
           <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Too many requests. Wait a moment.</p>
-        </div>
-      ),
-      intents: [<Button value="my_state">Try Again</Button>]
-    });
-  }
-
-  // اگر نزدیک به سقف باشیم، حالت لودینگ نمایش داده شود
-  if (rateLimitStatus.isLoading) {
-    return c.res({
-      image: (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#fff3cd' }}>
-          <p style={{ color: '#856404', fontSize: '30px', fontFamily: 'Poetsen One' }}>Loading... Please wait.</p>
         </div>
       ),
       intents: [<Button value="my_state">Try Again</Button>]
@@ -325,7 +327,7 @@ app.frame('/', async (c) => {
             textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username || 'Unknown'}</p>
           <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
             color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
-            FID: {fid || 'N/A'}
+            FID: ${fid || 'N/A'}
           </p>
           <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
           <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
