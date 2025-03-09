@@ -24,9 +24,9 @@ let cache: {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 5;           // حداکثر درخواست در ثانیه
-const MAX_RPM = 300;         // حداکثر درخواست در دقیقه
-const LOAD_THRESHOLD = 4;    // آستانه لودینگ (نزدیک شدن به سقف درخواست در ثانیه)
+const MAX_RPS = 3;           // حداکثر درخواست در ثانیه (کاهش به 3 برای لیمیت سرور)
+const MAX_RPM = 180;         // حداکثر درخواست در دقیقه (3 × 60)
+const LOAD_THRESHOLD = 2;    // آستانه لودینگ (نزدیک شدن به سقف درخواست در ثانیه)
 const SECOND_DURATION = 1000;
 const MINUTE_DURATION = 60000;
 
@@ -39,8 +39,6 @@ function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   }
   
   // پاکسازی درخواست‌های قدیمی دقیقه
-
-
   while (minuteTimestamps.length > 0 && now - minuteTimestamps[0] > MINUTE_DURATION) {
     minuteTimestamps.shift();
   }
@@ -222,11 +220,11 @@ async function updateCache() {
     const rows = await fetchQueryResult(queryId);
     cache.queries[queryId] = { rows, lastUpdated: now };
     console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
-    }
-    cache.updateCountToday += 1;
-    cache.lastUpdateDay = currentDay;
-    await saveCache();
-    console.log('[Cache] Scheduled update completed');
+  }
+  cache.updateCountToday += 1;
+  cache.lastUpdateDay = currentDay;
+  await saveCache();
+  console.log('[Cache] Scheduled update completed');
 }
 
 function getUserDataFromCache(fid: string) {
