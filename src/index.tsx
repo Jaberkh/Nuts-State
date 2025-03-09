@@ -10,18 +10,16 @@ let cache: {
   initialFetchDone: boolean;
   updateCountToday: number;
   lastUpdateDay: number;
-  userCache: Record<string, { todayPeanutCount: number, totalPeanutCount: number, sentPeanutCount: number, remainingAllowance: number, userRank: number, lastUpdated: number }>;
 } = {
   queries: {
-    '4810732': { rows: [], lastUpdated: 0 }, // دیلی
-    '4815993': { rows: [], lastUpdated: 0 }, // توتال ناتس
-    '4811780': { rows: [], lastUpdated: 0 }, // الوانس
-    '4801919': { rows: [], lastUpdated: 0 }  // لیدربرد
+    '4826752': { rows: [], lastUpdated: 0 }, // دیلی
+    '4826755': { rows: [], lastUpdated: 0 }, // توتال ناتس
+    '4826761': { rows: [], lastUpdated: 0 }, // الوانس
+    '4826767': { rows: [], lastUpdated: 0 }  // لیدربرد
   },
   initialFetchDone: false,
   updateCountToday: 0,
-  lastUpdateDay: 0,
-  userCache: {} // کش جدا برای هر FID
+  lastUpdateDay: 0
 };
 
 const secondTimestamps: number[] = [];
@@ -60,31 +58,25 @@ async function loadCache() {
     const loadedCache = JSON.parse(data);
     cache = {
       queries: {
-        '4810732': loadedCache.queries['4810732'] || { rows: [], lastUpdated: 0 },
-        '4815993': loadedCache.queries['4815993'] || { rows: [], lastUpdated: 0 },
-        '4811780': loadedCache.queries['4811780'] || { rows: [], lastUpdated: 0 },
-        '4801919': loadedCache.queries['4801919'] || { rows: [], lastUpdated: 0 }
+        '4826752': loadedCache.queries['4826752'] || { rows: [], lastUpdated: 0 },
+        '4826755': loadedCache.queries['4826755'] || { rows: [], lastUpdated: 0 },
+        '4826761': loadedCache.queries['4826761'] || { rows: [], lastUpdated: 0 },
+        '4826767': loadedCache.queries['4826767'] || { rows: [], lastUpdated: 0 }
       },
       initialFetchDone: loadedCache.initialFetchDone || false,
       updateCountToday: loadedCache.updateCountToday || 0,
-      lastUpdateDay: loadedCache.lastUpdateDay || 0,
-      userCache: loadedCache.userCache || {}
+      lastUpdateDay: loadedCache.lastUpdateDay || 0
     };
-    console.log(`[Cache] Loaded: initialFetchDone=${cache.initialFetchDone}, updateCountToday=${cache.updateCountToday}, lastUpdateDay=${new Date(cache.lastUpdateDay).toUTCString()}, userCache size=${Object.keys(cache.userCache).length}`);
+    console.log(`[Cache] Loaded: initialFetchDone=${cache.initialFetchDone}, updateCountToday=${cache.updateCountToday}, lastUpdateDay=${new Date(cache.lastUpdateDay).toUTCString()}`);
   } catch (error) {
-    console.error('[Cache] Error loading cache file:', error);
-    console.log('[Cache] Starting with empty cache');
+    console.log('[Cache] No cache file found or invalid JSON. Starting fresh');
   }
 }
 
 async function saveCache() {
   console.log('[Cache] Saving cache to file');
-  try {
-    await fs.writeFile(cacheFile, JSON.stringify(cache, null, 2));
-    console.log('[Cache] Cache saved successfully');
-  } catch (error) {
-    console.error('[Cache] Error saving cache:', error);
-  }
+  await fs.writeFile(cacheFile, JSON.stringify(cache, null, 2));
+  console.log('[Cache] Cache saved');
 }
 
 console.log('[Server] Initializing cache');
@@ -157,101 +149,88 @@ function shouldUpdateApi(lastUpdated: number) {
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const currentDay = getCurrentUTCDay();
-  const isNewDay = lastUpdated < currentDay;
 
-  const updateTimes = [180, 540, 605, 1123, 1260];
+  const updateTimes = [180, 369, 605, 1080, 1260]; // 3:00, 9:00, 10:05, 18:00, 21:00 UTC
   const isUpdateTime = updateTimes.some(time => Math.abs(totalMinutes - time) <= 5);
 
-  console.log(`[UpdateCheck] Time: ${totalMinutes} min (${utcHours}:${utcMinutes} UTC), Last Updated: ${new Date(lastUpdated).toUTCString()}, New Day: ${isNewDay}, Update Time: ${isUpdateTime}`);
-  return isUpdateTime && isNewDay;
+  console.log(`[UpdateCheck] Time: ${totalMinutes} min (${utcHours}:${utcMinutes} UTC), Last Updated: ${new Date(lastUpdated).toUTCString()}`);
+  return isUpdateTime;
 }
 
 async function updateCache() {
   console.log('[Cache] Entering updateCache');
   const now = Date.now();
   const currentDay = getCurrentUTCDay();
-  const lastUpdated = cache.queries['4810732'].lastUpdated || 0;
+
+  const queryIds = ['4826752', '4826755', '4826761', '4826767'];
+  for (const queryId of queryIds) {
+    if (!cache.queries[queryId]) {
+      cache.queries[queryId] = { rows: [], lastUpdated: 0 };
+    }
+  }
+
+  const lastUpdated = cache.queries['4826752'].lastUpdated;
 
   console.log(`[Cache] Last updated: ${new Date(lastUpdated).toUTCString()}, Initial Fetch Done: ${cache.initialFetchDone}, Update Count: ${cache.updateCountToday}, Last Update Day: ${new Date(cache.lastUpdateDay).toUTCString()}`);
 
-  // بار اول یا اگه کش خالیه
-  if (!cache.initialFetchDone || cache.queries['4810732'].rows.length === 0) {
-    console.log(`[Cache] First request or empty cache. Forcing update at ${new Date().toUTCString()}`);
-    const queryIds = ['4810732', '4815993', '4811780', '4801919'];
-    for (const queryId of queryIds) {
-      const rows = await fetchQueryResult(queryId);
-      console.log(`[Cache] Fetched rows for ${queryId}:`, rows.length);
-      cache.queries[queryId] = { rows, lastUpdated: now };
-      console.log(`[Cache] Stored ${cache.queries[queryId].rows.length} rows for Query ${queryId}`);
-    }
-    cache.initialFetchDone = true;
-    cache.updateCountToday = 1;
-    cache.lastUpdateDay = currentDay;
-    await saveCache();
-    console.log(`[Cache] Initial update completed, userCache unchanged, size: ${Object.keys(cache.userCache).length}`);
-    return;
-  }
-
-  // چک کردن روز جدید
   if (cache.lastUpdateDay < currentDay) {
     console.log('[Cache] New day detected. Resetting update count');
     cache.updateCountToday = 0;
     cache.lastUpdateDay = currentDay;
   }
 
-  // محدودیت 6 بار در روز
   if (cache.updateCountToday >= 6) {
-    console.log('[Cache] Max 6 updates reached for today. Using existing cache');
+    console.log('[Cache] Max 6 updates reached for today. Skipping');
     return;
   }
 
-  // فقط توی زمان‌های مشخص آپدیت کن
-  if (!shouldUpdateApi(lastUpdated)) {
-    console.log('[Cache] Not an update time or already updated today. Using existing cache');
-    return;
-  }
-
-  // آپدیت داده‌ها فقط برای queries
-  console.log(`[Cache] Scheduled update at ${new Date().toUTCString()}`);
-  const queryIds = ['4810732', '4815993', '4811780', '4801919'];
-  try {
+  if (!cache.initialFetchDone) {
+    console.log(`[Cache] First request. Forcing update at ${new Date().toUTCString()}`);
     for (const queryId of queryIds) {
       const rows = await fetchQueryResult(queryId);
-      console.log(`[Cache] Fetched rows for ${queryId}:`, rows.length);
       cache.queries[queryId] = { rows, lastUpdated: now };
-      console.log(`[Cache] Stored ${cache.queries[queryId].rows.length} rows for Query ${queryId}`);
+      console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
+    }
+    cache.initialFetchDone = true;
+    cache.updateCountToday += 1;
+    cache.lastUpdateDay = currentDay;
+    await saveCache();
+    console.log('[Cache] Initial fetch completed');
+    return;
+  }
+
+  if (!shouldUpdateApi(lastUpdated)) {
+    console.log('[Cache] Not an update time. Using existing cache');
+    return;
+  }
+
+  console.log(`[Cache] Scheduled update at ${new Date().toUTCString()}`);
+  for (const queryId of queryIds) {
+    const rows = await fetchQueryResult(queryId);
+    cache.queries[queryId] = { rows, lastUpdated: now };
+    console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
     }
     cache.updateCountToday += 1;
     cache.lastUpdateDay = currentDay;
     await saveCache();
-    console.log(`[Cache] Scheduled update completed, userCache unchanged, size: ${Object.keys(cache.userCache).length}`);
-  } catch (error) {
-    console.error('[Cache] Error during update, falling back to existing cache:', error);
-  }
+    console.log('[Cache] Scheduled update completed');
 }
 
-// تابع updateUserCache رو حذف می‌کنیم چون قرار نیست userCache رو آپدیت کنیم
-
 function getUserDataFromCache(fid: string) {
-  console.log(`[Data] Fetching data from userCache for FID ${fid}`);
-  const userData = cache.userCache[fid];
+  console.log(`[Data] Fetching data from cache for FID ${fid}`);
+  const todayPeanutCountRow = cache.queries['4826752'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
+  const totalPeanutCountRow = cache.queries['4826755'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
+  const sentPeanutCountRow = cache.queries['4826761'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
+  const userRankRow = cache.queries['4826767'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
 
-  if (userData) {
-    console.log(`[Data] FID ${fid} found in userCache - Today: ${userData.todayPeanutCount}, Total: ${userData.totalPeanutCount}, Sent: ${userData.sentPeanutCount}, Allowance: ${userData.remainingAllowance}, Rank: ${userData.userRank}`);
-    return userData;
-  }
+  const todayPeanutCount = todayPeanutCountRow.peanut_count || 0;
+  const totalPeanutCount = totalPeanutCountRow.total_peanut_count || 0;
+  const sentPeanutCount = sentPeanutCountRow.sent_peanut_count || 0;
+  const remainingAllowance = Math.max(30 - (sentPeanutCountRow.sent_peanut_count || 0), 0);
+  const userRank = userRankRow.rank || 0;
 
-  // اگه FID توی userCache نبود، به کاربر بگیم داده هنوز نیست
-  console.log(`[Data] FID ${fid} not found in userCache, returning placeholder`);
-  return {
-    todayPeanutCount: -1, // برای نشون دادن اینکه داده نیست
-    totalPeanutCount: -1,
-    sentPeanutCount: -1,
-    remainingAllowance: -1,
-    userRank: -1,
-    lastUpdated: cache.queries['4810732'].lastUpdated || Date.now()
-  };
+  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}`);
+  return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank };
 }
 
 app.frame('/', async (c) => {
@@ -287,18 +266,6 @@ app.frame('/', async (c) => {
   console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
   console.log('[Frame] User data fetched');
-
-  // اگه داده نبود، پیام به کاربر نشون بده
-  if (todayPeanutCount === -1) {
-    return c.res({
-      image: (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffffcc' }}>
-          <p style={{ color: '#ff9900', fontSize: '30px', fontFamily: 'Poetsen One' }}>Data not available yet. Check back later!</p>
-        </div>
-      ),
-      intents: [<Button value="my_state">Try Again</Button>]
-    });
-  }
 
   console.log('[Frame] Generating hashId');
   const hashId = await getOrGenerateHashId(fid);
