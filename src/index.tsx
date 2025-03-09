@@ -26,7 +26,7 @@ const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
 const MAX_RPS = 3;           // حداکثر درخواست در ثانیه (از 5 به 3 کاهش یافت)
 const MAX_RPM = 180;         // حداکثر درخواست در دقیقه (از 300 به 180 کاهش یافت)
-const LOAD_THRESHOLD = 2;    // آستانه لودینگ (از 4 به 2 کاهش یافت)
+const LOAD_THRESHOLD = 3;    // آستانه لودینگ (از 4 به 2 کاهش یافت)
 const SECOND_DURATION = 1000;
 const MINUTE_DURATION = 60000;
 
