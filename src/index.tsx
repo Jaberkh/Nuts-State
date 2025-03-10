@@ -30,38 +30,34 @@ const LOAD_THRESHOLD = 4;    // آستانه لودینگ (نزدیک شدن ب�
 const SECOND_DURATION = 1000;
 const MINUTE_DURATION = 60000;
 
+let isUpdating = false; // قفل برای جلوگیری از آپدیت همزمان
+let apiRequestCount = 0; // شمارنده درخواست‌های API
+
 function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   const now = Date.now();
 
-  // پاکسازی درخواست‌های قدیمی ثانیه
   while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
     secondTimestamps.shift();
   }
   
-  // پاکسازی درخواست‌های قدیمی دقیقه
-
-
   while (minuteTimestamps.length > 0 && now - minuteTimestamps[0] > MINUTE_DURATION) {
     minuteTimestamps.shift();
   }
 
-  // بررسی سقف درخواست‌ها
   if (secondTimestamps.length >= MAX_RPS || minuteTimestamps.length >= MAX_RPM) {
     console.log('[RateLimit] Too many requests. RPS:', secondTimestamps.length, 'RPM:', minuteTimestamps.length);
-    return { isAllowed: false, isLoading: false }; // رد درخواست
+    return { isAllowed: false, isLoading: false };
   }
 
-  // بررسی حالت لودینگ (نزدیک شدن به سقف)
   if (secondTimestamps.length >= LOAD_THRESHOLD) {
     console.log('[RateLimit] Approaching limit. Switching to loading state. RPS:', secondTimestamps.length);
-    return { isAllowed: true, isLoading: true }; // اجازه درخواست اما نمایش لودینگ
+    return { isAllowed: true, isLoading: true };
   }
 
-  // ثبت درخواست جدید
   secondTimestamps.push(now);
   minuteTimestamps.push(now);
   console.log('[RateLimit] Allowed. RPS Remaining:', MAX_RPS - secondTimestamps.length, 'RPM Remaining:', MAX_RPM - minuteTimestamps.length);
-  return { isAllowed: true, isLoading: false }; // اجازه درخواست عادی
+  return { isAllowed: true, isLoading: false };
 }
 
 async function loadCache() {
@@ -106,7 +102,7 @@ app.use(neynar({ apiKey: 'NEYNAR_FROG_FM', features: ['interactor', 'cast'] }));
 app.use('/*', serveStatic({ root: './public' }));
 
 async function fetchQueryResult(queryId: string) {
-  console.log(`[API] Fetching data for Query ${queryId}`);
+  console.log(`[API] Fetching data for Query ${queryId} (Request #${++apiRequestCount})`);
   try {
     console.log(`[API] Sending request to https://api.dune.com/api/v1/query/${queryId}/results`);
     const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/results`, {
@@ -171,63 +167,82 @@ function shouldUpdateApi(lastUpdated: number) {
 }
 
 async function updateCache() {
-  console.log('[Cache] Entering updateCache');
-  const now = Date.now();
-  const currentDay = getCurrentUTCDay();
-
-  const queryIds = ['4826752', '4826755', '4826761', '4826767'];
-  for (const queryId of queryIds) {
-    if (!cache.queries[queryId]) {
-      cache.queries[queryId] = { rows: [], lastUpdated: 0 };
-    }
-  }
-
-  const lastUpdated = cache.queries['4826752'].lastUpdated;
-
-  console.log(`[Cache] Last updated: ${new Date(lastUpdated).toUTCString()}, Initial Fetch Done: ${cache.initialFetchDone}, Update Count: ${cache.updateCountToday}, Last Update Day: ${new Date(cache.lastUpdateDay).toUTCString()}`);
-
-  if (cache.lastUpdateDay < currentDay) {
-    console.log('[Cache] New day detected. Resetting update count');
-    cache.updateCountToday = 0;
-    cache.lastUpdateDay = currentDay;
-  }
-
-  if (cache.updateCountToday >= 6) {
-    console.log('[Cache] Max 6 updates reached for today. Skipping');
+  if (isUpdating) {
+    console.log('[Cache] Update already in progress. Skipping');
     return;
   }
+  isUpdating = true;
+  try {
+    console.log('[Cache] Entering updateCache');
+    const now = Date.now();
+    const currentDay = getCurrentUTCDay();
 
-  if (!cache.initialFetchDone) {
-    console.log(`[Cache] First request. Forcing update at ${new Date().toUTCString()}`);
+    const queryIds = ['4826752', '4826755', '4826761', '4826767'];
+    for (const queryId of queryIds) {
+      if (!cache.queries[queryId]) {
+        cache.queries[queryId] = { rows: [], lastUpdated: 0 };
+      }
+    }
+
+    const lastUpdated = cache.queries['4826752'].lastUpdated;
+
+    console.log(`[Cache] Last updated: ${new Date(lastUpdated).toUTCString()}, Initial Fetch Done: ${cache.initialFetchDone}, Update Count: ${cache.updateCountToday}, Last Update Day: ${new Date(cache.lastUpdateDay).toUTCString()}`);
+
+    if (cache.lastUpdateDay < currentDay) {
+      console.log('[Cache] New day detected. Resetting update count');
+      cache.updateCountToday = 0;
+      cache.lastUpdateDay = currentDay;
+    }
+
+    if (cache.updateCountToday >= 6) {
+      console.log('[Cache] Max 6 updates reached for today. Skipping');
+      return;
+    }
+
+    if (!cache.initialFetchDone) {
+      console.log(`[Cache] First request. Forcing update at ${new Date().toUTCString()}`);
+      for (const queryId of queryIds) {
+        const rows = await fetchQueryResult(queryId);
+        cache.queries[queryId] = { rows, lastUpdated: now };
+        console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
+      }
+      cache.initialFetchDone = true;
+      cache.updateCountToday += 1;
+      cache.lastUpdateDay = currentDay;
+      await saveCache();
+      console.log('[Cache] Initial fetch completed');
+      return;
+    }
+
+    if (!shouldUpdateApi(lastUpdated)) {
+      console.log('[Cache] Not an update time. Using existing cache');
+      return;
+    }
+
+    console.log(`[Cache] Scheduled update at ${new Date().toUTCString()}`);
     for (const queryId of queryIds) {
       const rows = await fetchQueryResult(queryId);
       cache.queries[queryId] = { rows, lastUpdated: now };
       console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
     }
-    cache.initialFetchDone = true;
-    cache.updateCountToday += 1;
-    cache.lastUpdateDay = currentDay;
-    await saveCache();
-    console.log('[Cache] Initial fetch completed');
-    return;
-  }
-
-  if (!shouldUpdateApi(lastUpdated)) {
-    console.log('[Cache] Not an update time. Using existing cache');
-    return;
-  }
-
-  console.log(`[Cache] Scheduled update at ${new Date().toUTCString()}`);
-  for (const queryId of queryIds) {
-    const rows = await fetchQueryResult(queryId);
-    cache.queries[queryId] = { rows, lastUpdated: now };
-    console.log(`[Cache] Stored ${rows.length} rows for Query ${queryId}`);
-    }
     cache.updateCountToday += 1;
     cache.lastUpdateDay = currentDay;
     await saveCache();
     console.log('[Cache] Scheduled update completed');
+  } finally {
+    isUpdating = false;
+  }
 }
+
+function scheduleUpdates() {
+  setInterval(async () => {
+    console.log('[Scheduler] Checking for scheduled update');
+    await updateCache();
+  }, 5 * 60 * 1000); // هر 5 دقیقه چک کن
+}
+
+console.log('[Server] Starting update scheduler');
+scheduleUpdates();
 
 function getUserDataFromCache(fid: string) {
   console.log(`[Data] Fetching data from cache for FID ${fid}`);
@@ -252,8 +267,6 @@ app.frame('/', async (c) => {
 
   const rateLimitStatus = checkRateLimit();
 
-
-  // اگر درخواست رد شده باشد
   if (!rateLimitStatus.isAllowed) {
     return c.res({
       image: (
@@ -265,7 +278,6 @@ app.frame('/', async (c) => {
     });
   }
 
-  // اگر نزدیک به سقف باشیم، حالت لودینگ نمایش داده شود
   if (rateLimitStatus.isLoading) {
     return c.res({
       image: (
@@ -287,10 +299,6 @@ app.frame('/', async (c) => {
   const username = urlParams.get("username") || interactor.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
   console.log(`[Frame] FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
-
-  console.log('[Frame] Calling updateCache');
-  await updateCache();
-  console.log('[Frame] updateCache completed');
 
   console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
