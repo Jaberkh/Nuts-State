@@ -7,21 +7,16 @@ import fs from 'fs/promises';
 const cacheFile = './cache.json';
 let cache: {
   queries: Record<string, { rows: any[]; lastUpdated: number }>;
+  initialFetchDone: boolean;
   updateCountToday: number;
   lastUpdateDay: number;
-  initialFetchDone: boolean;
-  lastUpdateWindow: number;
 } = {
   queries: {
-    '4826752': { rows: [], lastUpdated: 0 }, // دیلی
-    '4826755': { rows: [], lastUpdated: 0 }, // توتال ناتس
-    '4826761': { rows: [], lastUpdated: 0 }, // الوانس
-    '4826767': { rows: [], lastUpdated: 0 }  // لیدربرد
+    '4837362': { rows: [], lastUpdated: 0 }
   },
-  updateCountToday: 0,
-  lastUpdateDay: 0,
   initialFetchDone: false,
-  lastUpdateWindow: 0
+  updateCountToday: 0,
+  lastUpdateDay: 0
 };
 
 const secondTimestamps: number[] = [];
@@ -34,23 +29,23 @@ const MINUTE_DURATION = 60000;
 
 let isUpdating = false;
 let apiRequestCount = 0;
-let updateInterval: NodeJS.Timeout | null = null;
 
 function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   const now = Date.now();
-  while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) secondTimestamps.shift();
-  while (minuteTimestamps.length > 0 && now - minuteTimestamps[0] > MINUTE_DURATION) minuteTimestamps.shift();
-
+  while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
+    secondTimestamps.shift();
+  }
+  while (minuteTimestamps.length > 0 && now - minuteTimestamps[0] > MINUTE_DURATION) {
+    minuteTimestamps.shift();
+  }
   if (secondTimestamps.length >= MAX_RPS || minuteTimestamps.length >= MAX_RPM) {
     console.log('[RateLimit] Too many requests. RPS:', secondTimestamps.length, 'RPM:', minuteTimestamps.length);
     return { isAllowed: false, isLoading: false };
   }
-
   if (secondTimestamps.length >= LOAD_THRESHOLD) {
-    console.log('[RateLimit] Approaching limit. RPS:', secondTimestamps.length);
+    console.log('[RateLimit] Approaching limit. Switching to loading state. RPS:', secondTimestamps.length);
     return { isAllowed: true, isLoading: true };
   }
-
   secondTimestamps.push(now);
   minuteTimestamps.push(now);
   console.log('[RateLimit] Allowed. RPS Remaining:', MAX_RPS - secondTimestamps.length, 'RPM Remaining:', MAX_RPM - minuteTimestamps.length);
@@ -64,44 +59,85 @@ async function loadCache() {
     const loadedCache = JSON.parse(data);
     cache = {
       queries: {
-        '4826752': loadedCache.queries['4826752'] || { rows: [], lastUpdated: 0 },
-        '4826755': loadedCache.queries['4826755'] || { rows: [], lastUpdated: 0 },
-        '4826761': loadedCache.queries['4826761'] || { rows: [], lastUpdated: 0 },
-        '4826767': loadedCache.queries['4826767'] || { rows: [], lastUpdated: 0 }
+        '4837362': loadedCache.queries['4837362'] || { rows: [], lastUpdated: 0 }
       },
-      updateCountToday: loadedCache.updateCountToday || 0,
-      lastUpdateDay: loadedCache.lastUpdateDay || 0,
       initialFetchDone: loadedCache.initialFetchDone || false,
-      lastUpdateWindow: loadedCache.lastUpdateWindow || 0
+      updateCountToday: loadedCache.updateCountToday || 0,
+      lastUpdateDay: loadedCache.lastUpdateDay || 0
     };
-    console.log('[Cache] Loaded from file:', JSON.stringify(cache, null, 2));
+    console.log(`[Cache] Loaded: initialFetchDone=${cache.initialFetchDone}, updateCountToday=${cache.updateCountToday}, lastUpdateDay=${new Date(cache.lastUpdateDay).toUTCString()}`);
   } catch (error) {
-    console.log('[Cache] No cache file found or invalid JSON. Starting with empty cache');
-    cache.initialFetchDone = false;
+    console.log('[Cache] No cache file found or invalid JSON. Starting fresh');
   }
 }
 
 async function saveCache() {
   console.log('[Cache] Saving cache to file');
   await fs.writeFile(cacheFile, JSON.stringify(cache, null, 2));
-  console.log('[Cache] Cache saved successfully');
+  console.log('[Cache] Cache saved');
+  if (cache.queries['4837362'].rows.length === 0) {
+    console.warn('[Cache] Warning: Cache saved with 0 rows');
+  } else {
+    console.log(`[Cache] Cache saved with ${cache.queries['4837362'].rows.length} rows`);
+  }
 }
 
-async function fetchQueryResult(queryId: string) {
-  console.log(`[API] Fetching data for Query ${queryId} (Request #${++apiRequestCount})`);
+console.log('[Server] Initializing cache');
+loadCache().then(() => console.log('[Server] Cache initialized'));
+
+export const app = new Frog({
+  title: 'Nut State',
+  imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
+});
+
+app.use(neynar({ apiKey: 'NEYNAR_FROG_FM', features: ['interactor', 'cast'] }));
+app.use('/*', serveStatic({ root: './public' }));
+
+async function executeQuery(queryId: string): Promise<string | null> {
+  console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount})`);
   try {
-    console.log(`[API] Sending request to https://api.dune.com/api/v1/query/${queryId}/results`);
-    const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/results`, {
-      method: 'GET',
-      headers: { 'X-Dune-API-Key': 'RhjCYVQmxhjppZqg7Z8DUWwpyFpjPYf4' }
+    const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/execute`, {
+      method: 'POST',
+      headers: { 'X-Dune-API-Key': 'CoMMnwtezMe3cVDY8WC7tLkJpTtlE4JX' }
     });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
     const data = await response.json();
+    const executionId = data.execution_id;
+    console.log(`[API] Query ${queryId} execution started with ID: ${executionId}`);
+    return executionId;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[API] Error executing Query ${queryId}:`, errorMessage);
+    return null;
+  }
+}
+
+async function fetchQueryResult(executionId: string, queryId: string) {
+  console.log(`[API] Fetching results for Query ${queryId} with execution ID ${executionId} (Request #${++apiRequestCount})`);
+  try {
+    const response = await fetch(`https://api.dune.com/api/v1/execution/${executionId}/results`, {
+      method: 'GET',
+      headers: { 'X-Dune-API-Key': 'CoMMnwtezMe3cVDY8WC7tLkJpTtlE4JX' }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+    const data = await response.json();
+    console.log(`[API] Full response for Query ${queryId}:`, JSON.stringify(data));
+    if (data.state === 'EXECUTING' || data.state === 'PENDING') {
+      console.log(`[API] Query ${queryId} still executing or pending. Results not ready yet.`);
+      return null;
+    }
     const results = data?.result?.rows || [];
     console.log(`[API] Fetched ${results.length} rows for Query ${queryId}`);
     return results;
   } catch (error: unknown) {
-    console.error(`[API] Error fetching Query ${queryId}:`, (error instanceof Error ? error.message : 'Unknown error'));
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[API] Error fetching Query ${queryId}:`, errorMessage);
     return [];
   }
 }
@@ -151,7 +187,9 @@ function shouldUpdateApi(lastUpdated: number) {
     return false;
   }
 
-  if (cache.lastUpdateWindow === closestUpdateTime) {
+  const lastUpdateMinutes = new Date(lastUpdated).getUTCHours() * 60 + new Date(lastUpdated).getUTCMinutes();
+  const alreadyUpdatedInWindow = Math.abs(lastUpdateMinutes - closestUpdateTime) <= 5;
+  if (alreadyUpdatedInWindow) {
     console.log(`[UpdateCheck] Current time: ${utcHours}:${utcMinutes} UTC, Already updated in this window (${closestUpdateTime} minutes)`);
     return false;
   }
@@ -160,134 +198,117 @@ function shouldUpdateApi(lastUpdated: number) {
   return true;
 }
 
-async function initialCacheUpdate() {
-  console.log('[Cache] Performing initial cache update due to empty cache');
-  const now = Date.now();
-  const queryIds = ['4826752', '4826755', '4826761', '4826767'];
-  for (const queryId of queryIds) {
-    const rows = await fetchQueryResult(queryId);
-    cache.queries[queryId] = { rows, lastUpdated: now };
-    console.log(`[Cache] Initial update for query ${queryId} with ${rows.length} rows from API`);
-  }
-  cache.initialFetchDone = true;
-  cache.updateCountToday = 1;
-  cache.lastUpdateDay = getCurrentUTCDay();
-  cache.lastUpdateWindow = 0;
-  await saveCache();
-  console.log('[Cache] Initial cache update completed');
-}
-
-async function updateCache() {
+async function updateQueries() {
   if (isUpdating) {
-    console.log('[Cache] Update already in progress. Skipping');
+    console.log('[Update] Update already in progress. Skipping');
     return;
   }
   isUpdating = true;
   try {
-    console.log('[Cache] Entering updateCache');
-    const now = new Date(); // اصلاح‌شده: از Date.now() به new Date()
+    console.log('[Update] Entering updateQueries');
+    const now = Date.now();
     const currentDay = getCurrentUTCDay();
+    const queryId = '4837362';
 
-    const queryIds = ['4826752', '4826755', '4826761', '4826767'];
-    for (const queryId of queryIds) {
-      if (!cache.queries[queryId]) {
-        cache.queries[queryId] = { rows: [], lastUpdated: 0 };
-        console.log(`[Cache] Initialized empty query ${queryId} in cache`);
-      }
-    }
-
-    const lastUpdated = cache.queries['4826752'].lastUpdated;
-    console.log(`[Cache] Current cache state - Last updated: ${new Date(lastUpdated).toUTCString()}, Update Count: ${cache.updateCountToday}, Last Update Day: ${new Date(cache.lastUpdateDay).toUTCString()}, Initial Fetch Done: ${cache.initialFetchDone}, Last Update Window: ${cache.lastUpdateWindow}`);
+    const lastUpdated = cache.queries[queryId].lastUpdated;
+    const isCacheEmpty = cache.queries[queryId].rows.length === 0;
+    console.log(`[Update] Last updated: ${new Date(lastUpdated).toUTCString()}, Initial Fetch Done: ${cache.initialFetchDone}, Update Count: ${cache.updateCountToday}, Last Update Day: ${new Date(cache.lastUpdateDay).toUTCString()}, Cache Empty: ${isCacheEmpty}`);
 
     if (cache.lastUpdateDay < currentDay) {
-      console.log('[Cache] New day detected. Resetting update count and window');
+      console.log('[Update] New day detected. Resetting update count');
       cache.updateCountToday = 0;
       cache.lastUpdateDay = currentDay;
-      cache.lastUpdateWindow = 0;
     }
 
     if (cache.updateCountToday >= 6) {
-      console.log('[Cache] Max 6 updates reached for today. Skipping');
+      console.log('[Update] Max 6 updates reached for today. Skipping');
+      return;
+    }
+
+    if (!cache.initialFetchDone || isCacheEmpty) {
+      console.log(`[Update] ${!cache.initialFetchDone ? 'First request' : 'Cache is empty'}. Forcing update at ${new Date().toUTCString()}`);
+      const executionId = await executeQuery(queryId);
+      if (!executionId) {
+        console.error('[Update] Failed to get execution ID. Aborting update');
+        return;
+      }
+
+      console.log('[Update] Waiting 3 minutes for query execution to complete');
+      await new Promise(resolve => setTimeout(resolve, 180000)); // 3 دقیقه صبر
+
+      const rows = await fetchQueryResult(executionId, queryId);
+      if (rows === null) {
+        console.warn('[Update] Results not ready after 3 minutes. Aborting');
+        return;
+      }
+      if (rows.length === 0) {
+        console.warn('[Update] No rows fetched from API despite expecting data');
+      }
+      cache.queries[queryId] = { rows, lastUpdated: now };
+      cache.initialFetchDone = true;
+      cache.updateCountToday += 1;
+      cache.lastUpdateDay = currentDay;
+      await saveCache();
+      console.log('[Update] Fetch completed due to initial fetch or empty cache');
       return;
     }
 
     if (!shouldUpdateApi(lastUpdated)) {
-      console.log('[Cache] Not an update time or already updated in this window. Using existing cache');
+      console.log('[Update] Not an update time. Skipping');
       return;
     }
 
-    console.log(`[Cache] Scheduled API update starting at ${now.toUTCString()}`);
-    for (const queryId of queryIds) {
-      const rows = await fetchQueryResult(queryId);
-      cache.queries[queryId] = { rows, lastUpdated: now.getTime() }; // getTime() برای ذخیره timestamp
-      console.log(`[Cache] Updated query ${queryId} with ${rows.length} rows from API`);
+    console.log(`[Update] Scheduled update at ${new Date().toUTCString()}`);
+    const executionId = await executeQuery(queryId);
+    if (!executionId) {
+      console.error('[Update] Failed to get execution ID. Aborting update');
+      return;
     }
+
+    console.log('[Update] Waiting 3 minutes for query execution to complete');
+    await new Promise(resolve => setTimeout(resolve, 180000)); // 3 دقیقه صبر
+
+    const rows = await fetchQueryResult(executionId, queryId);
+    if (rows === null) {
+      console.warn('[Update] Results not ready after 3 minutes. Aborting');
+      return;
+    }
+    if (rows.length === 0) {
+      console.warn('[Update] No rows fetched from API despite expecting data');
+    }
+    cache.queries[queryId] = { rows, lastUpdated: now };
     cache.updateCountToday += 1;
     cache.lastUpdateDay = currentDay;
-    const totalMinutes = now.getUTCHours() * 60 + now.getUTCMinutes(); // حالا درست کار می‌کنه
-    cache.lastUpdateWindow = [180, 369, 605, 1080, 1260].find(time => Math.abs(totalMinutes - time) <= 5) || 0;
     await saveCache();
-    console.log('[Cache] Scheduled API update completed');
+    console.log('[Update] Scheduled update completed');
   } finally {
     isUpdating = false;
-    console.log('[Cache] Exiting updateCache');
   }
 }
 
 function scheduleUpdates() {
-  if (updateInterval) {
-    console.log('[Scheduler] Scheduler already running. Skipping');
-    return;
-  }
-  console.log('[Scheduler] Starting update scheduler');
-  updateInterval = setInterval(async () => {
+  setInterval(async () => {
     console.log('[Scheduler] Checking for scheduled update');
-    await updateCache();
-  }, 5 * 60 * 1000); // هر 5 دقیقه
+    await updateQueries();
+  }, 5 * 60 * 1000); // هر 5 دقیقه چک می‌کنه
 }
 
-console.log('[Server] Initializing cache');
-loadCache().then(async () => {
-  console.log('[Server] Cache initialized');
-  if (!cache.initialFetchDone && Object.values(cache.queries).every(q => q.rows.length === 0)) {
-    await initialCacheUpdate();
-  }
-  scheduleUpdates();
-});
-
-process.on('SIGINT', () => {
-  if (updateInterval) {
-    clearInterval(updateInterval);
-    console.log('[Scheduler] Cleared update scheduler');
-  }
-  console.log('[Server] Shutting down');
-  process.exit();
-});
+console.log('[Server] Starting update scheduler');
+scheduleUpdates();
 
 function getUserDataFromCache(fid: string) {
-  console.log(`[Data] Fetching user data from cache for FID ${fid}`);
-  const todayPeanutCountRow = cache.queries['4826752'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
-  const totalPeanutCountRow = cache.queries['4826755'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
-  const sentPeanutCountRow = cache.queries['4826761'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
-  const userRankRow = cache.queries['4826767'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
+  console.log(`[Data] Fetching data from cache for FID ${fid}`);
+  const userData = cache.queries['4837362'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
 
-  const todayPeanutCount = todayPeanutCountRow.peanut_count || 0;
-  const totalPeanutCount = totalPeanutCountRow.total_peanut_count || 0;
-  const sentPeanutCount = sentPeanutCountRow.sent_peanut_count || 0;
-  const remainingAllowance = Math.max(30 - (sentPeanutCountRow.sent_peanut_count || 0), 0);
-  const userRank = userRankRow.rank || 0;
+  const todayPeanutCount = userData.daily_peanut_count || 0;
+  const totalPeanutCount = userData.all_time_peanut_count || 0;
+  const sentPeanutCount = userData.sent_peanut_count || 0;
+  const remainingAllowance = Math.max(30 - sentPeanutCount, 0);
+  const userRank = userData.rank || 0;
 
-  console.log(`[Data] Cache data for FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}`);
+  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}`);
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank };
 }
-
-export const app = new Frog({
-  title: 'Nut State',
-  imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
-});
-
-app.use(neynar({ apiKey: 'NEYNAR_FROG_FM', features: ['interactor', 'cast'] }));
-app.use('/*', serveStatic({ root: './public' }));
 
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
@@ -296,21 +317,23 @@ app.frame('/', async (c) => {
   const rateLimitStatus = checkRateLimit();
 
   if (!rateLimitStatus.isAllowed) {
-    console.log('[Frame] Rate limit exceeded');
     return c.res({
-      image: <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
-        <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Too many requests. Wait a moment.</p>
-      </div>,
+      image: (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
+          <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Too many requests. Wait a moment.</p>
+        </div>
+      ),
       intents: [<Button value="my_state">Try Again</Button>]
     });
   }
 
   if (rateLimitStatus.isLoading) {
-    console.log('[Frame] Rate limit approaching, showing loading state');
     return c.res({
-      image: <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#fff3cd' }}>
-        <p style={{ color: '#856404', fontSize: '30px', fontFamily: 'Poetsen One' }}>Loading... Please wait.</p>
-      </div>,
+      image: (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#fff3cd' }}>
+          <p style={{ color: '#856404', fontSize: '30px', fontFamily: 'Poetsen One' }}>Loading... Please wait.</p>
+        </div>
+      ),
       intents: [<Button value="my_state">Try Again</Button>]
     });
   }
@@ -324,57 +347,70 @@ app.frame('/', async (c) => {
   const fid = urlParams.get("fid") || interactor.fid || "N/A";
   const username = urlParams.get("username") || interactor.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
-  console.log(`[Frame] User info - FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
+  console.log(`[Frame] FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
 
-  console.log('[Frame] Fetching user data from cache (no direct API call)');
+  console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
+  console.log('[Frame] User data fetched');
 
   console.log('[Frame] Generating hashId');
   const hashId = await getOrGenerateHashId(fid);
   console.log('[Frame] Building frame URL');
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
   console.log(`[Frame] Generated frameUrl: ${frameUrl}`);
-
   console.log('[Frame] Building compose URL');
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
     `Check out your 🥜 stats! \n\n Frame by @arsalang75523 & @jeyloo.eth `
   )}&embeds[]=${encodeURIComponent(frameUrl)}`;
   console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
 
-  console.log('[Frame] Rendering image with cached data');
-  return c.res({
-    image: (
-      <div style={{
-        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-        width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/761/573945608_bg.png)',
-        backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-        textAlign: 'center', position: 'relative'
-      }}>
-        {pfpUrl && typeof pfpUrl === 'string' && pfpUrl.length > 0 && (
-          <img src={pfpUrl} alt="Profile Picture" style={{
-            width: '230px', height: '230px', borderRadius: '50%', position: 'absolute',
-            top: '22%', left: '12%', transform: 'translate(-50%, -50%)', border: '3px solid white'
-          }} />
-        )}
-        <p style={{ position: 'absolute', top: '15%', left: '60%', transform: 'translate(-50%, -50%)',
-          color: 'white', fontSize: '52px', fontWeight: 'bold', fontFamily: 'Poetsen One',
-          textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username || 'Unknown'}</p>
-        <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
-          color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
-          FID: {fid || 'N/A'}
-        </p>
-        <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
-        <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
-        <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
-        <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
-      </div>
-    ),
-    intents: [
-      <Button value="my_state">My State</Button>,
-      <Button.Link href={composeCastUrl}>Share</Button.Link>,
-      <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
-    ],
-  });
+  try {
+    console.log('[Frame] Rendering image');
+    return c.res({
+      image: (
+        <div style={{
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/761/573945608_bg.png)',
+          backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+          textAlign: 'center', position: 'relative'
+        }}>
+          {pfpUrl && typeof pfpUrl === 'string' && pfpUrl.length > 0 && (
+            <img src={pfpUrl} alt="Profile Picture" style={{
+              width: '230px', height: '230px', borderRadius: '50%', position: 'absolute',
+              top: '22%', left: '12%', transform: 'translate(-50%, -50%)', border: '3px solid white'
+            }} />
+          )}
+          <p style={{ position: 'absolute', top: '15%', left: '60%', transform: 'translate(-50%, -50%)',
+            color: 'white', fontSize: '52px', fontWeight: 'bold', fontFamily: 'Poetsen One',
+            textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username || 'Unknown'}</p>
+          <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
+            color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
+            FID: {fid || 'N/A'}
+          </p>
+          <p style={{ position: 'absolute', top: '47%', left: '32%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
+          <p style={{ position: 'absolute', top: '47%', left: '60%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '32%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
+          <p style={{ position: 'absolute', top: '77%', left: '60%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
+        </div>
+      ),
+      intents: [
+        <Button value="my_state">My State</Button>,
+        <Button.Link href={composeCastUrl}>Share</Button.Link>,
+        <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
+      ],
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Frame] Render error:', errorMessage);
+    return c.res({
+      image: (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%', backgroundColor: '#ffcccc' }}>
+          <p style={{ color: '#ff0000', fontSize: '30px', fontFamily: 'Poetsen One' }}>Error rendering frame. Please try again.</p>
+        </div>
+      ),
+      intents: [<Button value="my_state">Try Again</Button>]
+    });
+  }
 });
 
 const port = process.env.PORT || 3000;
