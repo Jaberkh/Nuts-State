@@ -26,7 +26,6 @@ const MAX_RPM = 300;
 const LOAD_THRESHOLD = 4;
 const SECOND_DURATION = 1000;
 const MINUTE_DURATION = 60000;
-
 let isUpdating = false;
 let apiRequestCount = 0;
 
@@ -180,20 +179,17 @@ function shouldUpdateApi(lastUpdated: number) {
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
   const updateTimes = [180, 369, 605, 1080, 1260]; // 3:00, 6:09, 10:05, 18:00, 21:00 UTC
-
   const closestUpdateTime = updateTimes.find(time => Math.abs(totalMinutes - time) <= 5);
   if (!closestUpdateTime) {
     console.log(`[UpdateCheck] Current time: ${utcHours}:${utcMinutes} UTC, Not in update window`);
     return false;
   }
-
   const lastUpdateMinutes = new Date(lastUpdated).getUTCHours() * 60 + new Date(lastUpdated).getUTCMinutes();
   const alreadyUpdatedInWindow = Math.abs(lastUpdateMinutes - closestUpdateTime) <= 5;
   if (alreadyUpdatedInWindow) {
     console.log(`[UpdateCheck] Current time: ${utcHours}:${utcMinutes} UTC, Already updated in this window (${closestUpdateTime} minutes)`);
     return false;
   }
-
   console.log(`[UpdateCheck] Current time: ${utcHours}:${utcMinutes} UTC, Should update for ${closestUpdateTime} minutes`);
   return true;
 }
@@ -209,7 +205,6 @@ async function updateQueries() {
     const now = Date.now();
     const currentDay = getCurrentUTCDay();
     const queryId = '4837362';
-
     const lastUpdated = cache.queries[queryId].lastUpdated;
     const isCacheEmpty = cache.queries[queryId].rows.length === 0;
     console.log(`[Update] Last updated: ${new Date(lastUpdated).toUTCString()}, Initial Fetch Done: ${cache.initialFetchDone}, Update Count: ${cache.updateCountToday}, Last Update Day: ${new Date(cache.lastUpdateDay).toUTCString()}, Cache Empty: ${isCacheEmpty}`);
@@ -232,10 +227,8 @@ async function updateQueries() {
         console.error('[Update] Failed to get execution ID. Aborting update');
         return;
       }
-
       console.log('[Update] Waiting 3 minutes for query execution to complete');
       await new Promise(resolve => setTimeout(resolve, 180000)); // 3 دقیقه صبر
-
       const rows = await fetchQueryResult(executionId, queryId);
       if (rows === null) {
         console.warn('[Update] Results not ready after 3 minutes. Aborting');
@@ -244,6 +237,8 @@ async function updateQueries() {
       if (rows.length === 0) {
         console.warn('[Update] No rows fetched from API despite expecting data');
       }
+      cache.queries[queryId].rows = [];
+      console.log('[Update] Cleared old cache rows before update');
       cache.queries[queryId] = { rows, lastUpdated: now };
       cache.initialFetchDone = true;
       cache.updateCountToday += 1;
@@ -264,10 +259,8 @@ async function updateQueries() {
       console.error('[Update] Failed to get execution ID. Aborting update');
       return;
     }
-
     console.log('[Update] Waiting 3 minutes for query execution to complete');
     await new Promise(resolve => setTimeout(resolve, 180000)); // 3 دقیقه صبر
-
     const rows = await fetchQueryResult(executionId, queryId);
     if (rows === null) {
       console.warn('[Update] Results not ready after 3 minutes. Aborting');
@@ -276,6 +269,8 @@ async function updateQueries() {
     if (rows.length === 0) {
       console.warn('[Update] No rows fetched from API despite expecting data');
     }
+    cache.queries[queryId].rows = [];
+    console.log('[Update] Cleared old cache rows before update');
     cache.queries[queryId] = { rows, lastUpdated: now };
     cache.updateCountToday += 1;
     cache.lastUpdateDay = currentDay;
@@ -299,13 +294,11 @@ scheduleUpdates();
 function getUserDataFromCache(fid: string) {
   console.log(`[Data] Fetching data from cache for FID ${fid}`);
   const userData = cache.queries['4837362'].rows.find((row: any) => row.fid == fid || row.parent_fid == fid) || {};
-
   const todayPeanutCount = userData.daily_peanut_count || 0;
   const totalPeanutCount = userData.all_time_peanut_count || 0;
   const sentPeanutCount = userData.sent_peanut_count || 0;
   const remainingAllowance = Math.max(30 - sentPeanutCount, 0);
   const userRank = userData.rank || 0;
-
   console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}`);
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank };
 }
@@ -313,9 +306,7 @@ function getUserDataFromCache(fid: string) {
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
   console.log('[Frame] User-Agent:', c.req.header('user-agent'));
-
   const rateLimitStatus = checkRateLimit();
-
   if (!rateLimitStatus.isAllowed) {
     return c.res({
       image: (
@@ -326,7 +317,6 @@ app.frame('/', async (c) => {
       intents: [<Button value="my_state">Try Again</Button>]
     });
   }
-
   if (rateLimitStatus.isLoading) {
     return c.res({
       image: (
@@ -337,22 +327,17 @@ app.frame('/', async (c) => {
       intents: [<Button value="my_state">Try Again</Button>]
     });
   }
-
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
   console.log('[Frame] URL Params:', urlParams.toString());
-
   const defaultInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
   const interactor = (c.var as any)?.interactor ?? defaultInteractor;
-
   const fid = urlParams.get("fid") || interactor.fid || "N/A";
   const username = urlParams.get("username") || interactor.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
   console.log(`[Frame] FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
-
   console.log('[Frame] Fetching user data from cache');
   const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank } = getUserDataFromCache(fid);
   console.log('[Frame] User data fetched');
-
   console.log('[Frame] Generating hashId');
   const hashId = await getOrGenerateHashId(fid);
   console.log('[Frame] Building frame URL');
@@ -363,7 +348,6 @@ app.frame('/', async (c) => {
     `Check out your 🥜 stats! \n\n Frame by @arsalang75523 & @jeyloo.eth `
   )}&embeds[]=${encodeURIComponent(frameUrl)}`;
   console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
-
   try {
     console.log('[Frame] Rendering image');
     return c.res({
@@ -415,4 +399,10 @@ app.frame('/', async (c) => {
 
 const port = process.env.PORT || 3000;
 console.log(`[Server] Starting server on port ${port}`);
-serve(app);
+serve({
+  fetch: app.fetch,
+  port: Number(port)
+});
+
+// خط آخر برای چک کردن کامل بودن کد
+console.log('[End] Code execution reached the end of the file');
