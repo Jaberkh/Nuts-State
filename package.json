@@ -3,9 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node index.js",  
-    "build": "frog vercel-build",
-    "deploy": "vercel"
+    "dev": "frog dev",
+  "start": "npm run dev"
   },
   "dependencies": {
     "@hono/node-server": "latest",
@@ -17,7 +16,6 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "satori": "^0.12.1",
-    "sqlite3": "^5.1.7",
     "yoga-wasm-web": "^0.3.3"
   },
   "devDependencies": {
