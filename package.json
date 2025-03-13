@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "frog vercel-build",
+    "build": "tsc",
+    "start": "node --max-old-space-size=384 dist/index.js",
     "dev": "frog dev",
-    "deploy": "vercel",
-    "start": "npm run dev"
+    "deploy": "vercel"
+    
   },
   "dependencies": {
     "@hono/node-server": "latest",
