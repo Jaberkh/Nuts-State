@@ -95,15 +95,7 @@ async function saveCache() {
 console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
 
-export const app = new Frog<{
-  Variables: {
-    interactor?: {
-      fid: string;
-      username: string;
-      pfpUrl: string;
-    };
-  };
-}>({
+export const app = new Frog({
   title: 'Nut State',
   imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
 });
@@ -193,29 +185,33 @@ function getCurrentUTCDay(): number {
 function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   console.log('[UpdateCheck] Checking if API update is allowed');
   const now = new Date();
+  const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000; // 2 ساعت در میلی‌ثانیه
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const updateTimes = [180, 353, 625, 1080, 1260];
+  const updateTimes = [180, 353, 625, 1080, 1260]; // زمان‌های مشخص (دقیقه)
 
-  if (isCacheEmpty && !cache.initialFetchDone) {
-    console.log(`[UpdateCheck] Cache is empty and initial fetch not done. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
+  // اگر کش خالی باشه، فوراً اجازه آپدیت می‌ده
+  if (isCacheEmpty) {
+    console.log(`[UpdateCheck] Cache is empty. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
     return true;
   }
 
+  // چک کردن زمان‌های مشخص
   const closestUpdateTime = updateTimes.find(time => Math.abs(totalMinutes - time) <= 5);
   if (!closestUpdateTime) {
     console.log(`[UpdateCheck] Current time: ${utcHours}:${utcMinutes} UTC, Not in update window`);
     return false;
   }
 
-  const timeSinceLastUpdate = (now.getTime() - lastUpdated) / (1000 * 60);
-  if (timeSinceLastUpdate < 30) {
-    console.log(`[UpdateCheck] Last update was ${timeSinceLastUpdate.toFixed(2)} minutes ago. Too soon to update again.`);
+  // چک کردن فاصله ۲ ساعته
+  const timeSinceLastUpdate = now.getTime() - lastUpdated;
+  if (timeSinceLastUpdate < TWO_HOURS_IN_MS) {
+    console.log(`[UpdateCheck] In update window (${closestUpdateTime} minutes), but last update was ${(timeSinceLastUpdate / (1000 * 60)).toFixed(2)} minutes ago (< 2 hours). No update allowed`);
     return false;
   }
 
-  console.log(`[UpdateCheck] Scheduled update allowed at ${closestUpdateTime} minutes`);
+  console.log(`[UpdateCheck] In update window (${closestUpdateTime} minutes) and last update was ${(timeSinceLastUpdate / (1000 * 60)).toFixed(2)} minutes ago (> 2 hours). Allowing update`);
   return true;
 }
 
@@ -247,7 +243,7 @@ async function updateQueries() {
     }
 
     if (!shouldUpdateApi(lastUpdated, isCacheEmpty)) {
-      console.log('[Update] Not an update time or too soon since last update. Skipping');
+      console.log('[Update] Conditions for update not met. Skipping');
       return;
     }
 
@@ -309,6 +305,7 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   const userRow = cache.queries['4837362'].rows.find((row) => row.fid === fid) || { data: {}, cumulativeExcess: 0 };
   const userData: ApiRow = userRow.data;
 
+  // چک کردن وجود fid به صورت امن
   const hasFid = 'fid' in userRow && userRow.fid !== undefined;
   if (!hasFid) {
     console.warn(`[Data] No data found in cache.json for FID ${fid}. Returning default values`);
@@ -359,9 +356,7 @@ app.frame('/', async (c) => {
   console.log('[Frame] URL Params:', urlParams.toString());
 
   const defaultInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
-  const interactor = (c.var.interactor && typeof c.var.interactor === 'object') 
-    ? c.var.interactor 
-    : defaultInteractor;
+  const interactor = (c.var as any)?.interactor ?? defaultInteractor;
 
   const fid = String(urlParams.get("fid") || interactor.fid || "N/A");
   const username = urlParams.get("username") || interactor.username || "Unknown";
@@ -411,21 +406,22 @@ app.frame('/', async (c) => {
           <p style={{ position: 'absolute', top: '76%', left: '24%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
           <p style={{ position: 'absolute', top: '76%', left: '52%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
           <p style={{ position: 'absolute', top: '62%', left: '87%', color: '#ff0000', fontSize: '43px', fontFamily: 'Poetsen One' }}>
-            {reduceEndSeason !== 0 ? String(reduceEndSeason) : ''}
-          </p>
-          {reduceEndSeason === 0 && (
-            <img 
-              src="https://img12.pixhost.to/images/870/575350880_tik.png" 
-              alt="No data" 
-              width="80" 
-              height="80" 
-              style={{
-                position: 'absolute',  
-                top: '63%',            
-                left: '85%',          
-              }}
-            />
-          )}
+          {reduceEndSeason !== 0 ? String(reduceEndSeason) : ''}
+</p>
+{reduceEndSeason === 0 && (
+  <img 
+    src="https://img12.pixhost.to/images/870/575350880_tik.png" 
+    alt="No data" 
+    width="80" 
+    height="80" 
+    style={{
+      position: 'absolute',  
+      top: '63%',            
+      left: '85%',          
+    }}
+  />
+)}
+
         </div>
       ),
       intents: [
@@ -450,4 +446,3 @@ app.frame('/', async (c) => {
 
 const port = process.env.PORT || 3000;
 console.log(`[Server] Starting server on port ${port}`);
-serve(app);
