@@ -188,7 +188,7 @@ function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const updateTimes = [180, 369, 625, 1080, 1260];
+  const updateTimes = [180, 353, 625, 1080, 1260];
 
   if (isCacheEmpty && !cache.initialFetchDone) {
     console.log(`[UpdateCheck] Cache is empty and initial fetch not done. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
@@ -370,7 +370,7 @@ app.frame('/', async (c) => {
   console.log(`[Frame] Generated frameUrl: ${frameUrl}`);
   console.log('[Frame] Building compose URL');
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
-    `Check out your 🥜 stats! \n\n Frame by @arsalang75523 & @jeyloo.eth `
+    `Check out your 🥜 stats! \n\n Frame by @arsalang.eth & @jeyloo.eth `
   )}&embeds[]=${encodeURIComponent(frameUrl)}`;
   console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
 
