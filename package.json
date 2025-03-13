@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node index.js", 
-    "dev": "frog dev",         
-    "build": "frog vercel-build", 
+    "start": "node src/index.js",  
+    "dev": "frog dev",
+    "build": "frog vercel-build",
     "deploy": "vercel"
   },
   "dependencies": {
