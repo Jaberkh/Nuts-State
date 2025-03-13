@@ -9,6 +9,6 @@
     "outDir": "build",
     "esModuleInterop": true
   },
-  "include": ["app/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules"]
 }
