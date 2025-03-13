@@ -1,5 +1,5 @@
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Button, Frog } from 'frog';
+import { Button, Frog, type FrameContext } from 'frog';
 import { serve } from "@hono/node-server";
 import { neynar } from 'frog/middlewares';
 import fs from 'fs/promises';
@@ -94,6 +94,20 @@ async function saveCache() {
 
 console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
+
+// تعریف تایپ برای interactor
+interface NeynarInteractor {
+  fid: string;
+  username: string;
+  pfpUrl: string;
+}
+
+// گسترش دادن FrameContext
+type CustomFrameContext = FrameContext & {
+  var: {
+    interactor?: NeynarInteractor;
+  };
+};
 
 export const app = new Frog({
   title: 'Nut State',
@@ -319,7 +333,7 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason };
 }
 
-app.frame('/', async (c) => {
+app.frame('/', async (c: CustomFrameContext) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
   console.log('[Frame] User-Agent:', c.req.header('user-agent'));
 
@@ -350,8 +364,10 @@ app.frame('/', async (c) => {
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
   console.log('[Frame] URL Params:', urlParams.toString());
 
-  const defaultInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
-  const interactor = (c.var as any)?.interactor ?? defaultInteractor;
+  const defaultInteractor: NeynarInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
+  const interactor = (c.var && c.var.interactor && typeof c.var.interactor === 'object') 
+    ? c.var.interactor 
+    : defaultInteractor;
 
   const fid = String(urlParams.get("fid") || interactor.fid || "N/A");
   const username = urlParams.get("username") || interactor.username || "Unknown";
