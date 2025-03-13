@@ -446,3 +446,4 @@ app.frame('/', async (c) => {
 
 const port = process.env.PORT || 3000;
 console.log(`[Server] Starting server on port ${port}`);
+serve(app);
