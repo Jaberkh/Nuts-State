@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "frog vercel-build",
-    "dev": "frog dev",
-    "deploy": "vercel",
-    "start": "npm run dev"
+    "start": "node index.js", 
+    "dev": "frog dev",         
+    "build": "frog vercel-build", 
+    "deploy": "vercel"
   },
   "dependencies": {
     "@hono/node-server": "latest",
