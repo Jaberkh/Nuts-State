@@ -301,7 +301,6 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   const userRow = cache.queries['4837362'].rows.find((row) => row.fid === fid) || { data: {}, cumulativeExcess: 0 };
   const userData: ApiRow = userRow.data;
 
-  // چک کردن وجود fid به صورت امن
   const hasFid = 'fid' in userRow && userRow.fid !== undefined;
   if (!hasFid) {
     console.warn(`[Data] No data found in cache.json for FID ${fid}. Returning default values`);
@@ -402,22 +401,21 @@ app.frame('/', async (c) => {
           <p style={{ position: 'absolute', top: '76%', left: '24%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
           <p style={{ position: 'absolute', top: '76%', left: '52%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
           <p style={{ position: 'absolute', top: '62%', left: '87%', color: '#ff0000', fontSize: '43px', fontFamily: 'Poetsen One' }}>
-          {reduceEndSeason !== 0 ? String(reduceEndSeason) : ''}
-</p>
-{reduceEndSeason === 0 && (
-  <img 
-    src="https://img12.pixhost.to/images/870/575350880_tik.png" 
-    alt="No data" 
-    width="80" 
-    height="80" 
-    style={{
-      position: 'absolute',  
-      top: '63%',            
-      left: '85%',          
-    }}
-  />
-)}
-
+            {reduceEndSeason !== 0 ? String(reduceEndSeason) : ''}
+          </p>
+          {reduceEndSeason === 0 && (
+            <img 
+              src="https://img12.pixhost.to/images/870/575350880_tik.png" 
+              alt="No data" 
+              width="80" 
+              height="80" 
+              style={{
+                position: 'absolute',  
+                top: '63%',            
+                left: '85%',          
+              }}
+            />
+          )}
         </div>
       ),
       intents: [
