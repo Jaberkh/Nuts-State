@@ -1,5 +1,5 @@
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Button, Frog, type FrameContext } from 'frog';
+import { Button, Frog } from 'frog';
 import { serve } from "@hono/node-server";
 import { neynar } from 'frog/middlewares';
 import fs from 'fs/promises';
@@ -95,21 +95,15 @@ async function saveCache() {
 console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
 
-// تعریف تایپ برای interactor
-interface NeynarInteractor {
-  fid: string;
-  username: string;
-  pfpUrl: string;
-}
-
-// گسترش دادن FrameContext
-type CustomFrameContext = FrameContext & {
-  var: {
-    interactor?: NeynarInteractor;
+export const app = new Frog<{
+  Variables: {
+    interactor?: {
+      fid: string;
+      username: string;
+      pfpUrl: string;
+    };
   };
-};
-
-export const app = new Frog({
+}>({
   title: 'Nut State',
   imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
 });
@@ -333,7 +327,7 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason };
 }
 
-app.frame('/', async (c: CustomFrameContext) => {
+app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
   console.log('[Frame] User-Agent:', c.req.header('user-agent'));
 
@@ -364,8 +358,8 @@ app.frame('/', async (c: CustomFrameContext) => {
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
   console.log('[Frame] URL Params:', urlParams.toString());
 
-  const defaultInteractor: NeynarInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
-  const interactor = (c.var && c.var.interactor && typeof c.var.interactor === 'object') 
+  const defaultInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
+  const interactor = (c.var.interactor && typeof c.var.interactor === 'object') 
     ? c.var.interactor 
     : defaultInteractor;
 
