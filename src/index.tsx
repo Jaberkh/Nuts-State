@@ -159,7 +159,6 @@ function generateHashId(fid: string): string {
   console.log(`[Hash] Generated hashId: ${hashId}`);
   return hashId;
 }
-
 const hashIdCache: Record<string, string> = {};
 
 async function getOrGenerateHashId(fid: string): Promise<string> {
