@@ -298,10 +298,7 @@ function scheduleUpdates() {
 
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
-
-const specialFids = ["312316","248836","425967","417832","442770","349975","921344","395478","426167"];
-
-
+const specialFids = ["312316","248836","425967","417832","442770","349975","921344","395478","426167","443855"];
 
 function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: number } {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
