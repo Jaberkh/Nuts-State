@@ -159,6 +159,7 @@ function generateHashId(fid: string): string {
   console.log(`[Hash] Generated hashId: ${hashId}`);
   return hashId;
 }
+
 const hashIdCache: Record<string, string> = {};
 
 async function getOrGenerateHashId(fid: string): Promise<string> {
@@ -298,13 +299,17 @@ function scheduleUpdates() {
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
 
+const specialFids = ["312316","248836","425967","417832","442770","349975","921344","395478","426167"];
+const logFids = ["312316", "248836", "425967", "417832", "442770", "349975", "921344", "395478", "443855"];
+
+
+
 function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: number } {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
 
   const userRow = cache.queries['4837362'].rows.find((row) => row.fid === fid) || { data: {}, cumulativeExcess: 0 };
   const userData: ApiRow = userRow.data;
 
-  // چک کردن وجود fid به صورت امن
   const hasFid = 'fid' in userRow && userRow.fid !== undefined;
   if (!hasFid) {
     console.warn(`[Data] No data found in cache.json for FID ${fid}. Returning default values`);
@@ -315,13 +320,25 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   const todayPeanutCount = userData.daily_peanut_count || 0;
   const totalPeanutCount = userData.all_time_peanut_count || 0;
   const sentPeanutCount = userData.sent_peanut_count || 0;
+
   const remainingAllowance = Math.max(30 - sentPeanutCount, 0);
   const userRank = userData.rank || 0;
-  const reduceEndSeason = userRow.cumulativeExcess || 0;
-
+  
+  let reduceEndSeason = sentPeanutCount > 30 ? sentPeanutCount - 30 : 0;
+  if (specialFids.includes(fid)) {
+    reduceEndSeason = 0; // مقدار را عددی نگه می‌داریم ولی در UI تغییر می‌دهیم
+  }
+  
   console.log(`[Data] FID ${fid} from cache.json - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}`);
+
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason };
 }
+
+// ثبت لاگ برای FID های مشخص‌شده
+logFids.forEach(fid => {
+  const userData = getUserDataFromCache(fid);
+  console.log(`[Log] FID: ${fid}, Remaining Allowance: ${userData.remainingAllowance}, Reduce End Season: ${userData.reduceEndSeason}`);
+});
 
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
