@@ -300,7 +300,6 @@ console.log('[Server] Starting update scheduler');
 scheduleUpdates();
 
 const specialFids = ["312316","248836","425967","417832","442770","349975","921344","395478","426167"];
-const logFids = ["312316", "248836", "425967", "417832", "442770", "349975", "921344", "395478", "443855"];
 
 
 
@@ -333,12 +332,6 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
 
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason };
 }
-
-// ثبت لاگ برای FID های مشخص‌شده
-logFids.forEach(fid => {
-  const userData = getUserDataFromCache(fid);
-  console.log(`[Log] FID: ${fid}, Remaining Allowance: ${userData.remainingAllowance}, Reduce End Season: ${userData.reduceEndSeason}`);
-});
 
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
