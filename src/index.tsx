@@ -189,7 +189,7 @@ function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const updateTimes = [180, 353, 625, 1080, 1260]; // زمان‌های مشخص (دقیقه)
+  const updateTimes = [180, 353, 625, 765, 1080, 1260]; // زمان‌های مشخص (دقیقه)
 
   // اگر کش خالی باشه، فوراً اجازه آپدیت می‌ده
   if (isCacheEmpty) {
@@ -298,7 +298,7 @@ function scheduleUpdates() {
 
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
-const specialFids = ["312316","248836","425967","417832","442770","349975","921344","395478","426167","443855"];
+const specialFids = ["312316","248836","425967","417832","442770","349975","921344","395478","426167"];
 
 function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: number } {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
