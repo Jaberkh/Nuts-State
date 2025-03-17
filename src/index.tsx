@@ -326,7 +326,7 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   
   let reduceEndSeason = sentPeanutCount > 30 ? sentPeanutCount - 30 : 0;
   if (specialFids.includes(fid)) {
-    reduceEndSeason = 0; // مقدار را عددی نگه می‌داریم ولی در UI تغییر می‌دهیم
+    reduceEndSeason = 0; 
   }
   
   console.log(`[Data] FID ${fid} from cache.json - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}`);
