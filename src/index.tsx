@@ -438,8 +438,8 @@ app.frame('/', async (c) => {
   <img 
     src="https://img12.pixhost.to/images/1012/577450080_og.png" 
     alt="Special image" 
-    width="90" 
-    height="80" 
+    width="95" 
+    height="75" 
     style={{
       position: 'absolute',  
       top: '63%',            
