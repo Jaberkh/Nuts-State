@@ -298,7 +298,9 @@ function scheduleUpdates() {
 
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
-const specialFids = ["312316", "248836", "425967", "417832", "442770", "349975", "921344", "395478", "426167", "482887"];
+const specialFids = ["312316", "248836", "425967", "417832", "442770", "395478","349975", "921344", "426167", "482887","435085",
+  "231533","429293"
+];
 
 function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: number } {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
@@ -397,7 +399,7 @@ app.frame('/', async (c) => {
       image: (
         <div style={{
           display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/870/575350666_bg.png)',
+          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/1015/577507406_bg.png)',
           backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
           textAlign: 'center', position: 'relative'
         }}>
@@ -421,6 +423,25 @@ app.frame('/', async (c) => {
           <p style={{ position: 'absolute', top: '62%', left: '87%', color: '#ff0000', fontSize: '43px', fontFamily: 'Poetsen One' }}>
   {reduceEndSeason > 0 ? String(reduceEndSeason) : ''}
 </p>
+<p style={{ position: 'absolute', top: '45%', left: '81%', color: '#efb976', fontSize: '29px', fontFamily: 'Poetsen One' }}>
+  {reduceEndSeason >= 0 ? (
+    <>
+<div style={{ display: "flex", flexDirection: "column" }}>
+  <p style={{ lineHeight: "1", margin: "0" }}>Reduced at</p>
+  <p style={{ lineHeight: "1", margin: "0" }}>Season End</p>
+</div>
+
+
+
+    </>
+  ) : (
+    <span style={{ top: "60%",  color: "#efb976", fontSize: "25px", fontFamily: "Poetsen One" }}>
+    Member Type
+  </span>
+  
+  )}
+</p>
+
 {reduceEndSeason === 0 && (
   <img 
     src="https://img12.pixhost.to/images/870/575350880_tik.png" 
@@ -436,14 +457,14 @@ app.frame('/', async (c) => {
 )}
 {reduceEndSeason  < 0 && (
   <img 
-    src="https://img12.pixhost.to/images/1012/577450080_og.png" 
+    src="https://img12.pixhost.to/images/1016/577511680_og.png" 
     alt="Special image" 
-    width="95" 
-    height="75" 
+    width="125" 
+    height="125" 
     style={{
       position: 'absolute',  
-      top: '63%',            
-      left: '85%',          
+      top: '59%',            
+      left: '83%',          
     }}
   />
 )}
@@ -456,7 +477,7 @@ app.frame('/', async (c) => {
         <Button value="my_state">My State</Button>,
         <Button.Link href={composeCastUrl}>Share</Button.Link>,
         <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
-        <Button.Link href="https://foundation.app/mint/base/0x8AaB3b53d0F29A3EE07B24Ea253494D03a42e2fB">Get OG</Button.Link>,
+        <Button.Link href="https://foundation.app/mint/base/0x8AaB3b53d0F29A3EE07B24Ea253494D03a42e2fB">Be OG</Button.Link>,
       ],
     });
   } catch (error: unknown) {
