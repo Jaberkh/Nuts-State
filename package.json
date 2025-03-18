@@ -29,5 +29,11 @@
     "@types/ratelimiter": "^3.4.6",
     "ts-node": "^10.9.2",
     "typescript": "latest"
-  }
+  },
+  
+    "engines": {
+      "node": ">=19.9.0"
+    }
+  
+  
 }
