@@ -299,7 +299,7 @@ function scheduleUpdates() {
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
 const specialFids = ["312316", "248836", "425967", "417832", "442770", "395478","349975", "921344", "426167", "482887","435085",
-  "231533","429293"
+  "231533","429293","1015315","508756"
 ];
 
 function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: number } {
