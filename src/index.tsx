@@ -3,6 +3,8 @@ import { Button, Frog } from 'frog';
 import { serve } from "@hono/node-server";
 import { neynar } from 'frog/middlewares';
 import fs from 'fs/promises';
+import Moralis from 'moralis';
+import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
 
 interface ApiRow {
   fid?: string;
@@ -39,6 +41,22 @@ const MINUTE_DURATION = 60000;
 
 let isUpdating = false;
 let apiRequestCount = 0;
+
+
+const NFT_CONTRACT_ADDRESS = '0x8AaB3b53d0F29A3EE07B24Ea253494D03a42e2fB';
+const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImQ0NWYyNDBhLWFhOTctNDUwYi1iMWVlLTBjYTY0NzhjMzUwMiIsIm9yZ0lkIjoiNDM2OTgyIiwidXNlcklkIjoiNDQ5NTQzIiwidHlwZUlkIjoiY2ZlODFiYTQtY2I2Yy00NGIzLTgxOGMtYWQwNGM5NDhhNDFjIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDIzMjQ1NDEsImV4cCI6NDg5ODA4NDU0MX0.ZosOIvUNacwkQQbzrn4Nqr1Luw7K5XsJE-WAaGd0Ggw';
+
+const config = new Configuration({
+  apiKey: 'NEYNAR_FROG_FM', 
+});
+const client = new NeynarAPIClient(config);
+
+console.log('[Moralis] Initializing Moralis SDK');
+Moralis.start({ apiKey: MORALIS_API_KEY }).then(() => {
+  console.log('[Moralis] Moralis SDK initialized successfully');
+}).catch((error) => {
+  console.error('[Moralis] Error initializing Moralis SDK:', error);
+});
 
 function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   const now = Date.now();
@@ -191,20 +209,17 @@ function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   const totalMinutes = utcHours * 60 + utcMinutes;
   const updateTimes = [180, 353, 625, 1080, 1260]; // زمان‌های مشخص (دقیقه)
 
-  // اگر کش خالی باشه، فوراً اجازه آپدیت می‌ده
   if (isCacheEmpty) {
     console.log(`[UpdateCheck] Cache is empty. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
     return true;
   }
 
-  // چک کردن زمان‌های مشخص
   const closestUpdateTime = updateTimes.find(time => Math.abs(totalMinutes - time) <= 5);
   if (!closestUpdateTime) {
     console.log(`[UpdateCheck] Current time: ${utcHours}:${utcMinutes} UTC, Not in update window`);
     return false;
   }
 
-  // چک کردن فاصله ۲ ساعته
   const timeSinceLastUpdate = now.getTime() - lastUpdated;
   if (timeSinceLastUpdate < TWO_HOURS_IN_MS) {
     console.log(`[UpdateCheck] In update window (${closestUpdateTime} minutes), but last update was ${(timeSinceLastUpdate / (1000 * 60)).toFixed(2)} minutes ago (< 2 hours). No update allowed`);
@@ -298,11 +313,52 @@ function scheduleUpdates() {
 
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
-const specialFids = ["312316", "248836", "425967", "417832", "442770", "395478","349975", "921344", "426167", "482887","435085",
-  "231533","429293","1015315","508756"
-];
 
-function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: number } {
+async function getWalletAddressFromFid(fid: string): Promise<string | null> {
+  console.log(`[Neynar] Fetching wallet address for FID ${fid}`);
+  if (fid === 'N/A') {
+    console.log('[Neynar] FID is N/A, skipping request');
+    return null;
+  }
+  try {
+    const response = await client.fetchBulkUsers({ fids: [Number(fid)] });
+    const user = response.users[0];
+    // اول verified_addresses رو چک می‌کنیم، اگه نبود custody_address
+    const walletAddress = user?.verified_addresses?.eth_addresses?.[0] || user?.custody_address;
+    console.log(`[Neynar] Wallet address for FID ${fid}: ${walletAddress}`);
+    return walletAddress || null;
+  } catch (error) {
+    console.error(`[Neynar] Error fetching wallet address: ${error}`);
+    return null;
+  }
+}
+
+async function isNFTHolder(fid: string): Promise<boolean> {
+  console.log(`[NFT] Checking if FID ${fid} holds NFT from ${NFT_CONTRACT_ADDRESS}`);
+  try {
+    const walletAddress = await getWalletAddressFromFid(fid);
+    if (!walletAddress) {
+      console.log(`[NFT] No wallet address found for FID ${fid}`);
+      return false;
+    }
+
+    const response = await Moralis.EvmApi.nft.getWalletNFTs({
+      chain: '0x2105', // base 
+      address: walletAddress,
+      tokenAddresses: [NFT_CONTRACT_ADDRESS],
+    });
+
+    const hasNFT = response.result.length > 0;
+    console.log(`[NFT] FID ${fid} has NFT: ${hasNFT}`);
+    return hasNFT;
+  } catch (error) {
+    console.error(`[NFT] Error checking holder status: ${error}`);
+    return false;
+  }
+}
+
+
+async function getUserDataFromCache(fid: string): Promise<{ todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: string | number }> {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
 
   const userRow = cache.queries['4837362'].rows.find((row) => row.fid === fid) || { data: {}, cumulativeExcess: 0 };
@@ -319,25 +375,15 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   const totalPeanutCount = userData.all_time_peanut_count || 0;
   const sentPeanutCount = userData.sent_peanut_count || 0;
 
-  let remainingAllowance = Math.max(30 - sentPeanutCount, 0);
-
-  // تنظیم مقدار remainingAllowance برای FIDهای خاص
-  if (specialFids.includes(fid)) {
-    remainingAllowance = 150;
-  }
-
+  const isHolder = await isNFTHolder(fid);
+  const maxAllowance = isHolder ? 150 : 30;
+  const remainingAllowance = Math.max(maxAllowance - sentPeanutCount, 0);
   const userRank = userData.rank || 0;
-  
-  let reduceEndSeason = sentPeanutCount > 30 ? sentPeanutCount - 30 : 0;
-  if (specialFids.includes(fid)) {
-    reduceEndSeason = -1; 
-  }
-  
-  console.log(`[Data] FID ${fid} from cache.json - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}`);
+  const reduceEndSeason = isHolder ? 'og' : (userRow.cumulativeExcess || 0);
 
+  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}`);
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason };
 }
-
 
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
@@ -379,7 +425,7 @@ app.frame('/', async (c) => {
   console.log(`[Frame] FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
 
   console.log('[Frame] Fetching user data exclusively from cache.json');
-  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason } = getUserDataFromCache(fid);
+  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason } = await getUserDataFromCache(fid);
   console.log('[Frame] User data fetched exclusively from cache.json');
 
   console.log('[Frame] Generating hashId');
@@ -420,11 +466,18 @@ app.frame('/', async (c) => {
           <p style={{ position: 'absolute', top: '47%', left: '52%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
           <p style={{ position: 'absolute', top: '76%', left: '24%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
           <p style={{ position: 'absolute', top: '76%', left: '52%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
-          <p style={{ position: 'absolute', top: '62%', left: '87%', color: '#ff0000', fontSize: '43px', fontFamily: 'Poetsen One' }}>
-  {reduceEndSeason > 0 ? String(reduceEndSeason) : ''}
+          <p style={{ 
+    position: 'absolute', 
+    top: '62%', 
+    left: '87%', 
+    color: '#ff0000', 
+    fontSize: '43px', 
+    fontFamily: 'Poetsen One' 
+}}>
+    {reduceEndSeason !== 0 ? String(reduceEndSeason) : ''}
 </p>
 <p style={{ position: 'absolute', top: '45%', left: '81%', color: '#efb976', fontSize: '29px', fontFamily: 'Poetsen One' }}>
-  {reduceEndSeason >= 0 ? (
+  {reduceEndSeason !== "og" ? (
     <>
 <div style={{ display: "flex", flexDirection: "column" }}>
   <p style={{ lineHeight: "1", margin: "0" }}>Reduced at</p>
@@ -441,35 +494,32 @@ app.frame('/', async (c) => {
   
   )}
 </p>
-
 {reduceEndSeason === 0 && (
-  <img 
-    src="https://img12.pixhost.to/images/870/575350880_tik.png" 
-    alt="No data" 
-    width="80" 
-    height="80" 
-    style={{
-      position: 'absolute',  
-      top: '63%',            
-      left: '85%',          
-    }}
-  />
+    <img 
+        src="https://img12.pixhost.to/images/870/575350880_tik.png" 
+        alt="No data" 
+        width="80" 
+        height="80" 
+        style={{
+            position: 'absolute',  
+            top: '63%',            
+            left: '85%',          
+        }}
+    />
 )}
-{reduceEndSeason  < 0 && (
-  <img 
-    src="https://img12.pixhost.to/images/1016/577511680_og.png" 
-    alt="Special image" 
-    width="125" 
-    height="125" 
-    style={{
-      position: 'absolute',  
-      top: '59%',            
-      left: '83%',          
-    }}
-  />
+{reduceEndSeason === "og" && (
+    <img 
+        src="https://img12.pixhost.to/images/1016/577511680_og.png" 
+        alt="OG Badge" 
+        width="125" 
+        height="125" 
+        style={{
+          position: 'absolute',  
+          top: '59%',            
+          left: '83%',                 
+        }}
+    />
 )}
-
-
 
         </div>
       ),
