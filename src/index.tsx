@@ -330,6 +330,9 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   if (specialFids.includes(fid)) {
     reduceEndSeason = 0; 
   }
+  if (specialFids.includes(fid)) {
+    reduceEndSeason = -1; 
+  }
   
   console.log(`[Data] FID ${fid} from cache.json - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}`);
 
@@ -417,9 +420,8 @@ app.frame('/', async (c) => {
           <p style={{ position: 'absolute', top: '47%', left: '24%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
           <p style={{ position: 'absolute', top: '47%', left: '52%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
           <p style={{ position: 'absolute', top: '76%', left: '24%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
-          <p style={{ position: 'absolute', top: '76%', left: '52%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
           <p style={{ position: 'absolute', top: '62%', left: '87%', color: '#ff0000', fontSize: '43px', fontFamily: 'Poetsen One' }}>
-          {reduceEndSeason !== 0 ? String(reduceEndSeason) : ''}
+  {reduceEndSeason !== 0 ? String(reduceEndSeason) : ''}
 </p>
 {reduceEndSeason === 0 && (
   <img 
@@ -434,6 +436,21 @@ app.frame('/', async (c) => {
     }}
   />
 )}
+{reduceEndSeason === -1 && (
+  <img 
+    src="https://img12.pixhost.to/images/1012/577450080_og.png" 
+    alt="no data" 
+    width="80" 
+    height="70" 
+    style={{
+      position: 'absolute',  
+      top: '63%',            
+      left: '85%',          
+    }}
+  />
+)}
+
+
 
         </div>
       ),

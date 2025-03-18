@@ -2545,7 +2545,7 @@
             "fid": null,
             "parent_fid": 395478,
             "rank": 196,
-            "sent_peanut_count": null,
+            "sent_peanut_count": 35,
             "total_peanut_count": 703
           },
           "cumulativeExcess": 0
