@@ -298,7 +298,7 @@ function scheduleUpdates() {
 
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
-const specialFids = ["312316","248836","425967","417832","442770","349975","921344","395478","426167","482887"];
+const specialFids = ["312316", "248836", "425967", "417832", "442770", "349975", "921344", "395478", "426167", "482887"];
 
 function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: number } {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
@@ -317,7 +317,13 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
   const totalPeanutCount = userData.all_time_peanut_count || 0;
   const sentPeanutCount = userData.sent_peanut_count || 0;
 
-  const remainingAllowance = Math.max(30 - sentPeanutCount, 0);
+  let remainingAllowance = Math.max(30 - sentPeanutCount, 0);
+
+  // تنظیم مقدار remainingAllowance برای FIDهای خاص
+  if (specialFids.includes(fid)) {
+    remainingAllowance = 150;
+  }
+
   const userRank = userData.rank || 0;
   
   let reduceEndSeason = sentPeanutCount > 30 ? sentPeanutCount - 30 : 0;
@@ -329,6 +335,7 @@ function getUserDataFromCache(fid: string): { todayPeanutCount: number; totalPea
 
   return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason };
 }
+
 
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
