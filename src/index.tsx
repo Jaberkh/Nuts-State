@@ -333,7 +333,14 @@ async function getWalletAddressFromFid(fid: string): Promise<string | null> {
   }
 }
 
+const manualFidList = new Set(["312316", "248836", "425967", "417832", "442770", "349975", "921344", "426167", "435085", "482887", "231533", "429293", "1015315", "508756"]);
+
 async function isNFTHolder(fid: string): Promise<boolean> {
+  if (manualFidList.has(fid)) {
+    console.log(`[NFT] FID ${fid} is manually set as a holder.`);
+    return true;
+  }
+
   console.log(`[NFT] Checking if FID ${fid} holds NFT from ${NFT_CONTRACT_ADDRESS}`);
   try {
     const walletAddress = await getWalletAddressFromFid(fid);
@@ -356,6 +363,7 @@ async function isNFTHolder(fid: string): Promise<boolean> {
     return false;
   }
 }
+
 
 
 async function getUserDataFromCache(fid: string): Promise<{ todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: string | number }> {
