@@ -333,7 +333,7 @@ async function getWalletAddressFromFid(fid: string): Promise<string | null> {
   }
 }
 
-const manualFidList = new Set(["312316", "248836", "425967", "417832", "442770", "349975", "921344", "426167", "435085", "482887", "231533", "429293", "1015315", "508756"]);
+const manualFidList = new Set(["312316", "443855","248836", "425967", "417832", "442770", "349975", "921344", "426167", "435085", "482887", "231533", "429293", "1015315", "508756"]);
 
 async function isNFTHolder(fid: string): Promise<boolean> {
   if (manualFidList.has(fid)) {
