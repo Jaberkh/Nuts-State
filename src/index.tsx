@@ -1,11 +1,12 @@
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Button, Frog } from 'frog';
+import { Button, Frog, TextInput } from 'frog';
 import { serve } from "@hono/node-server";
 import { neynar } from 'frog/middlewares';
 import fs from 'fs/promises';
 import Moralis from 'moralis';
 import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
 
+// تایپ‌ها
 interface ApiRow {
   fid?: string;
   parent_fid?: string;
@@ -16,16 +17,22 @@ interface ApiRow {
   [key: string]: any;
 }
 
+interface NFTHolder {
+  wallet: string;
+  count: number;
+}
+
+// ثابت‌ها
 const cacheFile = './cache.json';
+const ogHoldersFile = './nft_holders.json';
+const newHoldersFile = './new_nft_holders.json';
 let cache: {
   queries: Record<string, { rows: { fid: string; data: ApiRow; cumulativeExcess: number }[]; lastUpdated: number }>;
   initialFetchDone: boolean;
   updateCountToday: number;
   lastUpdateDay: number;
 } = {
-  queries: {
-    '4837362': { rows: [], lastUpdated: 0 }
-  },
+  queries: { '4837362': { rows: [], lastUpdated: 0 } },
   initialFetchDone: false,
   updateCountToday: 0,
   lastUpdateDay: 0
@@ -41,16 +48,20 @@ const MINUTE_DURATION = 60000;
 
 let isUpdating = false;
 let apiRequestCount = 0;
+let OGpic: number = 0;
+let Usertype = "";
+const OG_NFT_CONTRACT_ADDRESS = '0x8AaB3b53d0F29A3EE07B24Ea253494D03a42e2fB';
+const NEW_NFT_CONTRACT_ADDRESS = '0x36d4a78d0FB81A16A1349b8f95AF7d5d3CA25081';
+const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImE1MjE5NDlkLTU2MWItNDE5NC1hMmI5LTQxZTgxMDA4M2E3NyIsIm9yZ0lkIjoiNDM3MDA0IiwidXNlcklkIjoiNDQ5NTY1IiwidHlwZUlkIjoiNmJmNzAzZGItNmM1Ni00NGViLTg4ZmMtNjJjOWMzMTk4Zjc2IiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDIzMzMzNTksImV4cCI6NDg5ODA5MzM1OX0.Lv8JHB8RrbC7UWLJXHijd3kUsaaqmfUt14QCcW71JU0';
 
+// دکمه TRUE/FALSE برای هولدرهای بدون NFT
+const ALLOW_NON_HOLDERS = true;
 
-const NFT_CONTRACT_ADDRESS = '0x8AaB3b53d0F29A3EE07B24Ea253494D03a42e2fB';
-const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImQ0NWYyNDBhLWFhOTctNDUwYi1iMWVlLTBjYTY0NzhjMzUwMiIsIm9yZ0lkIjoiNDM2OTgyIiwidXNlcklkIjoiNDQ5NTQzIiwidHlwZUlkIjoiY2ZlODFiYTQtY2I2Yy00NGIzLTgxOGMtYWQwNGM5NDhhNDFjIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDIzMjQ1NDEsImV4cCI6NDg5ODA4NDU0MX0.ZosOIvUNacwkQQbzrn4Nqr1Luw7K5XsJE-WAaGd0Ggw';
-
-const config = new Configuration({
-  apiKey: 'NEYNAR_FROG_FM', 
-});
+// تنظیمات Neynar با API Key جدید
+const config = new Configuration({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17' });
 const client = new NeynarAPIClient(config);
 
+// راه‌اندازی Moralis
 console.log('[Moralis] Initializing Moralis SDK');
 Moralis.start({ apiKey: MORALIS_API_KEY }).then(() => {
   console.log('[Moralis] Moralis SDK initialized successfully');
@@ -58,6 +69,7 @@ Moralis.start({ apiKey: MORALIS_API_KEY }).then(() => {
   console.error('[Moralis] Error initializing Moralis SDK:', error);
 });
 
+// توابع
 function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   const now = Date.now();
   while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
@@ -84,11 +96,9 @@ async function loadCache() {
   console.log('[Cache] Loading cache from file');
   try {
     const data = await fs.readFile(cacheFile, 'utf8');
-    const loadedCache = JSON.parse(data);
+    const loadedCache = JSON.parse(data) as typeof cache;
     cache = {
-      queries: {
-        '4837362': loadedCache.queries['4837362'] || { rows: [], lastUpdated: 0 }
-      },
+      queries: { '4837362': loadedCache.queries['4837362'] || { rows: [], lastUpdated: 0 } },
       initialFetchDone: loadedCache.initialFetchDone || false,
       updateCountToday: loadedCache.updateCountToday || 0,
       lastUpdateDay: loadedCache.lastUpdateDay || 0
@@ -114,11 +124,13 @@ console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
 
 export const app = new Frog({
-  title: 'Nut State',
+    imageAspectRatio : '1:1',
+    title: 'Nuts State',
+  
   imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
 });
 
-app.use(neynar({ apiKey: 'NEYNAR_FROG_FM', features: ['interactor', 'cast'] }));
+app.use(neynar({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17', features: ['interactor', 'cast'] }));
 app.use('/*', serveStatic({ root: './public' }));
 
 async function executeQuery(queryId: string): Promise<string | null> {
@@ -132,11 +144,10 @@ async function executeQuery(queryId: string): Promise<string | null> {
       const errorText = await response.text();
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
-    const data = await response.json();
-    const executionId = data.execution_id;
-    console.log(`[API] Query ${queryId} execution started with ID: ${executionId}`);
-    return executionId;
-  } catch (error: unknown) {
+    const data = await response.json() as { execution_id: string };
+    console.log(`[API] Query ${queryId} execution started with ID: ${data.execution_id}`);
+    return data.execution_id;
+  } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`[API] Error executing Query ${queryId}:`, errorMessage);
     return null;
@@ -154,7 +165,7 @@ async function fetchQueryResult(executionId: string, queryId: string): Promise<A
       const errorText = await response.text();
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
-    const data = await response.json();
+    const data = await response.json() as { state: string; result?: { rows: ApiRow[] } };
     if (data.state === 'EXECUTING' || data.state === 'PENDING') {
       console.log(`[API] Query ${queryId} still executing or pending. Results not ready yet.`);
       return null;
@@ -162,7 +173,7 @@ async function fetchQueryResult(executionId: string, queryId: string): Promise<A
     const results: ApiRow[] = data?.result?.rows || [];
     console.log(`[API] Fetched ${results.length} rows for Query ${queryId}`);
     return results;
-  } catch (error: unknown) {
+  } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`[API] Error fetching Query ${queryId}:`, errorMessage);
     return [];
@@ -203,11 +214,11 @@ function getCurrentUTCDay(): number {
 function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   console.log('[UpdateCheck] Checking if API update is allowed');
   const now = new Date();
-  const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000; // 2 ساعت در میلی‌ثانیه
+  const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const updateTimes = [180, 353, 625, 1080, 1260]; // زمان‌های مشخص (دقیقه)
+  const updateTimes = [180, 353, 625, 1080, 1260];
 
   if (isCacheEmpty) {
     console.log(`[UpdateCheck] Cache is empty. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
@@ -281,16 +292,25 @@ async function updateQueries() {
       console.warn('[Update] No rows fetched from API despite expecting data');
     }
 
-    const updatedRows = rows.map((row: ApiRow) => {
+    const updatedRows = rows.map(async (row: ApiRow) => {
       const fid = String(row.fid || row.parent_fid || '');
       const sentPeanutCount = row.sent_peanut_count || 0;
-      const excessToday = sentPeanutCount > 30 ? sentPeanutCount - 30 : 0;
+
+      const ogNFTCount = await isOGNFTHolder(fid);
+      const newNFTCount = await isNewNFTHolder(fid);
+      const ogAllowance = ogNFTCount * 150;
+      const newAllowance = newNFTCount === 1 ? 30 : newNFTCount === 2 ? 45 : newNFTCount >= 3 ? 60 : 0;
+      const nonHolderAllowance = (ogNFTCount === 0 && newNFTCount === 0 && ALLOW_NON_HOLDERS) ? 30 : 0;
+      const maxAllowance = ogAllowance + newAllowance + nonHolderAllowance;
+
+      const excess = sentPeanutCount > maxAllowance ? sentPeanutCount - maxAllowance : 0;
       const existingRow = cache.queries[queryId].rows.find(r => r.fid === fid);
-      const previousExcess = existingRow ? existingRow.cumulativeExcess : 0;
-      return { fid, data: row, cumulativeExcess: previousExcess + excessToday };
+      const cumulativeExcess = (existingRow ? existingRow.cumulativeExcess : 0) + excess;
+
+      return { fid, data: row, cumulativeExcess };
     });
 
-    cache.queries[queryId] = { rows: updatedRows, lastUpdated: now };
+    cache.queries[queryId] = { rows: await Promise.all(updatedRows), lastUpdated: now };
     if (!cache.initialFetchDone && isCacheEmpty) {
       cache.initialFetchDone = true;
       console.log('[Update] Initial fetch completed and locked');
@@ -323,7 +343,6 @@ async function getWalletAddressFromFid(fid: string): Promise<string | null> {
   try {
     const response = await client.fetchBulkUsers({ fids: [Number(fid)] });
     const user = response.users[0];
-    // اول verified_addresses رو چک می‌کنیم، اگه نبود custody_address
     const walletAddress = user?.verified_addresses?.eth_addresses?.[0] || user?.custody_address;
     console.log(`[Neynar] Wallet address for FID ${fid}: ${walletAddress}`);
     return walletAddress || null;
@@ -333,70 +352,119 @@ async function getWalletAddressFromFid(fid: string): Promise<string | null> {
   }
 }
 
-const manualFidList = new Set(["312316", "443855","486468","248836", "499556","425967", "417832", "442770", "349975", "921344", "426167", "435085", "482887", "231533", "429293", "1015315", "508756"]);
-
-async function isNFTHolder(fid: string): Promise<boolean> {
-  if (manualFidList.has(fid)) {
-    console.log(`[NFT] FID ${fid} is manually set as a holder.`);
-    return true;
-  }
-
-  console.log(`[NFT] Checking if FID ${fid} holds NFT from ${NFT_CONTRACT_ADDRESS}`);
+async function isOGNFTHolder(fid: string): Promise<number> {
+  console.log(`[NFT] Checking if FID ${fid} holds OG NFT from ${OG_NFT_CONTRACT_ADDRESS} using offline data`);
   try {
     const walletAddress = await getWalletAddressFromFid(fid);
     if (!walletAddress) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
-      return false;
+      return 0;
     }
-
-    const response = await Moralis.EvmApi.nft.getWalletNFTs({
-      chain: '0x2105', // base 
-      address: walletAddress,
-      tokenAddresses: [NFT_CONTRACT_ADDRESS],
-    });
-
-    const hasNFT = response.result.length > 0;
-    console.log(`[NFT] FID ${fid} has NFT: ${hasNFT}`);
-    return hasNFT;
+    const holdersData = await fs.readFile(ogHoldersFile, 'utf8');
+    const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
+    const holder = holders.find(h => h.wallet.toLowerCase() === walletAddress.toLowerCase());
+    const count = holder ? holder.count : 0;
+    console.log(`[NFT] FID ${fid} (Wallet: ${walletAddress}) holds ${count} OG NFTs`);
+    return count;
   } catch (error) {
-    console.error(`[NFT] Error checking holder status: ${error}`);
-    return false;
+    console.error(`[NFT] Error checking OG holder status offline: ${error}`);
+    return 0;
   }
 }
 
+async function isNewNFTHolder(fid: string): Promise<number> {
+  console.log(`[NFT] Checking if FID ${fid} holds New NFT from ${NEW_NFT_CONTRACT_ADDRESS} using offline data`);
+  try {
+    const walletAddress = await getWalletAddressFromFid(fid);
+    if (!walletAddress) {
+      console.log(`[NFT] No wallet address found for FID ${fid}`);
+      return 0;
+    }
+    const holdersData = await fs.readFile(newHoldersFile, 'utf8');
+    const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
+    const holder = holders.find(h => h.wallet.toLowerCase() === walletAddress.toLowerCase());
+    const count = holder ? holder.count : 0;
+    console.log(`[NFT] FID ${fid} (Wallet: ${walletAddress}) holds ${count} New NFTs`);
+    return count;
+  } catch (error) {
+    console.error(`[NFT] Error checking New NFT holder status offline: ${error}`);
+    return 0;
+  }
+}
 
-
-async function getUserDataFromCache(fid: string): Promise<{ todayPeanutCount: number; totalPeanutCount: number; sentPeanutCount: number; remainingAllowance: number; userRank: number; reduceEndSeason: string | number }> {
+async function getUserDataFromCache(fid: string): Promise<{
+  todayPeanutCount: number;
+  totalPeanutCount: number;
+  sentPeanutCount: number;
+  remainingAllowance: string;
+  userRank: number;
+  reduceEndSeason: string;
+  usingWallet: string;
+}> {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
-
   const userRow = cache.queries['4837362'].rows.find((row) => row.fid === fid) || { data: {}, cumulativeExcess: 0 };
   const userData: ApiRow = userRow.data;
-
-  const hasFid = 'fid' in userRow && userRow.fid !== undefined;
-  if (!hasFid) {
-    console.warn(`[Data] No data found in cache.json for FID ${fid}. Returning default values`);
-  } else {
-    console.log(`[Data] Data found in cache.json for FID ${fid}`);
-  }
 
   const todayPeanutCount = userData.daily_peanut_count || 0;
   const totalPeanutCount = userData.all_time_peanut_count || 0;
   const sentPeanutCount = userData.sent_peanut_count || 0;
 
-  const isHolder = await isNFTHolder(fid);
-  const maxAllowance = isHolder ? 150 : 30;
-  const remainingAllowance = Math.max(maxAllowance - sentPeanutCount, 0);
-  const userRank = userData.rank || 0;
-  const reduceEndSeason = isHolder ? 'og' : (userRow.cumulativeExcess || 0);
+  const ogNFTCount = await isOGNFTHolder(fid);
+  const newNFTCount = await isNewNFTHolder(fid);
 
-  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}`);
-  return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason };
+  let maxAllowance: number;
+  let remainingAllowance: string;
+  let reduceEndSeason = '';
+
+  // محاسبه الوانس کل با جمع OG و NEW
+  const ogAllowance = ogNFTCount * 150;
+  const newAllowance = newNFTCount === 1 ? 30 : newNFTCount === 2 ? 45 : newNFTCount >= 3 ? 60 : 0;
+  const nonHolderAllowance = (ogNFTCount === 0 && newNFTCount === 0 && ALLOW_NON_HOLDERS) ? 30 : 0;
+  maxAllowance = ogAllowance + newAllowance + nonHolderAllowance;
+
+  if (ogNFTCount > 0 || newNFTCount > 0) {
+    remainingAllowance = `${maxAllowance}/${Math.max(maxAllowance - sentPeanutCount, 0)}`;
+    const excess = sentPeanutCount > maxAllowance ? sentPeanutCount - maxAllowance : 0;
+    const cumulativeExcess = userRow.cumulativeExcess + excess;
+    reduceEndSeason = ogNFTCount > 0 ? `${cumulativeExcess}` : newNFTCount === 1 ? `member (${cumulativeExcess})` : newNFTCount === 2 ? `regular (${cumulativeExcess})` : `active (${cumulativeExcess})`;
+    OGpic = ogNFTCount > 0 ? 1 : 0;
+  } else {
+    if (ALLOW_NON_HOLDERS) {
+      remainingAllowance = `${maxAllowance}/${Math.max(maxAllowance - sentPeanutCount, 0)}`;
+    } else {
+      maxAllowance = 0;
+      remainingAllowance = 'mint your allowance';
+    }
+    reduceEndSeason = String(sentPeanutCount);
+  }
+
+  const existingRowIndex = cache.queries['4837362'].rows.findIndex(row => row.fid === fid);
+  if (existingRowIndex !== -1 && (ogNFTCount > 0 || newNFTCount > 0)) {
+    cache.queries['4837362'].rows[existingRowIndex].cumulativeExcess = userRow.cumulativeExcess + (sentPeanutCount > maxAllowance ? sentPeanutCount - maxAllowance : 0);
+  } else if (existingRowIndex === -1 && (ogNFTCount > 0 || newNFTCount > 0)) {
+    cache.queries['4837362'].rows.push({ fid, data: userData, cumulativeExcess: sentPeanutCount > maxAllowance ? sentPeanutCount - maxAllowance : 0 });
+  }
+
+  if (newNFTCount === 1) {
+    Usertype = "Member";
+  } else if (newNFTCount === 2) {
+    Usertype = "Regular";
+  } else if (newNFTCount >= 3) {
+    Usertype = "Active";
+  } else if (newNFTCount <= 0) {
+    Usertype = "Noobie";
+  }
+
+  const userRank = userData.rank || 0;
+  const walletAddress = await getWalletAddressFromFid(fid);
+  const usingWallet = walletAddress ? `${walletAddress.slice(0, 3)}...${walletAddress.slice(-3)}` : 'N/A';
+
+  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}, UsingWallet: ${usingWallet}`);
+  return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, usingWallet };
 }
 
 app.frame('/', async (c) => {
   console.log(`[Frame] Request received at ${new Date().toUTCString()}`);
-  console.log('[Frame] User-Agent:', c.req.header('user-agent'));
-
   const rateLimitStatus = checkRateLimit();
 
   if (!rateLimitStatus.isAllowed) {
@@ -422,123 +490,280 @@ app.frame('/', async (c) => {
   }
 
   const urlParams = new URLSearchParams(c.req.url.split('?')[1]);
-  console.log('[Frame] URL Params:', urlParams.toString());
-
   const defaultInteractor = { fid: "N/A", username: "Unknown", pfpUrl: "" };
   const interactor = (c.var as any)?.interactor ?? defaultInteractor;
 
   const fid = String(urlParams.get("fid") || interactor.fid || "N/A");
   const username = urlParams.get("username") || interactor.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
-  console.log(`[Frame] FID: ${fid}, Username: ${username}, PFP: ${pfpUrl}`);
 
-  console.log('[Frame] Fetching user data exclusively from cache.json');
-  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason } = await getUserDataFromCache(fid);
-  console.log('[Frame] User data fetched exclusively from cache.json');
-
-  console.log('[Frame] Generating hashId');
+  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, usingWallet } = await getUserDataFromCache(fid);
   const hashId = await getOrGenerateHashId(fid);
-  console.log('[Frame] Building frame URL');
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
-  console.log(`[Frame] Generated frameUrl: ${frameUrl}`);
-  console.log('[Frame] Building compose URL');
-  const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
-    `Check out your 🥜 stats! \n\n Frame by @arsalang.eth & @jeyloo.eth `
-  )}&embeds[]=${encodeURIComponent(frameUrl)}`;
-  console.log(`[Frame] Generated composeCastUrl: ${composeCastUrl}`);
+  const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent('Check out your 🥜 stats! \n\n Frame by @arsalang.eth & @jeyloo.eth ')}&embeds[]=${encodeURIComponent(frameUrl)}`;
 
   try {
-    console.log('[Frame] Rendering image using data only from cache.json');
+    console.log("usertype:" , Usertype);
+    
     return c.res({
       image: (
-        <div style={{
-          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-          width: '100%', height: '100%', backgroundImage: 'url(https://img12.pixhost.to/images/1015/577507406_bg.png)',
-          backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-          textAlign: 'center', position: 'relative'
-        }}>
-          {pfpUrl && typeof pfpUrl === 'string' && pfpUrl.length > 0 && (
-            <img src={pfpUrl} alt="Profile Picture" style={{
-              width: '230px', height: '230px', borderRadius: '50%', position: 'absolute',
-              top: '22%', left: '12%', transform: 'translate(-50%, -50%)', border: '3px solid white'
-            }} />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            width: "100%", 
+            height: "100%", 
+            backgroundColor: "black",
+            color: "white",
+            fontFamily: "'Lilita One','Poppins'",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          {/* BG */}
+          <img
+            src="https://img12.pixhost.to/images/1086/578480364_bg.png"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          />
+    
+          {/* Pfp Url*/}
+          {pfpUrl && (
+            <img
+              src={pfpUrl}
+              alt="Profile Picture"
+              style={{
+                width: "160px",
+                height: "160px",
+                borderRadius: "50%",
+                position: "absolute",
+                top: "3.5%",
+                left: "25.5%",
+                border: "3px solid white",
+              }}
+            />
           )}
-          <p style={{ position: 'absolute', top: '15%', left: '60%', transform: 'translate(-50%, -50%)',
-            color: 'white', fontSize: '52px', fontWeight: 'bold', fontFamily: 'Poetsen One',
-            textShadow: '2px 2px 5px rgba(0, 0, 0, 0.7)' }}>{username || 'Unknown'}</p>
-          <p style={{ position: 'absolute', top: '25%', left: '60%', transform: 'translate(-50%, -50%)',
-            color: '#432818', fontSize: '30px', fontWeight: 'bold', fontFamily: 'Poetsen One' }}>
-            FID: {fid || 'N/A'}
+    
+          {/* Username */}
+          <p
+            style={{
+              position: "absolute",
+              top: "8%",
+              left: "57%",
+              transform: "translateX(-50%)",
+              color: "cyan",
+              fontSize: "30px",
+              fontWeight: "700",
+            }}
+          >
+            {username}
           </p>
-          <p style={{ position: 'absolute', top: '47%', left: '24%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(todayPeanutCount)}</p>
-          <p style={{ position: 'absolute', top: '47%', left: '52%', color: '#ff8c00', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(totalPeanutCount)}</p>
-          <p style={{ position: 'absolute', top: '76%', left: '24%', color: '#28a745', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(remainingAllowance)}</p>
-          <p style={{ position: 'absolute', top: '76%', left: '52%', color: '#007bff', fontSize: '40px', fontFamily: 'Poetsen One' }}>{String(userRank)}</p>
-          <p style={{ 
-    position: 'absolute', 
-    top: '62%', 
-    left: '87%', 
-    color: '#ff0000', 
-    fontSize: '43px', 
-    fontFamily: 'Poetsen One' 
-}}>
-    {reduceEndSeason !== 0 ? String(reduceEndSeason) : ''}
-</p>
-<p style={{ position: 'absolute', top: '45%', left: '81%', color: '#efb976', fontSize: '29px', fontFamily: 'Poetsen One' }}>
-  {reduceEndSeason !== "og" ? (
-    <>
-<div style={{ display: "flex", flexDirection: "column" }}>
-  <p style={{ lineHeight: "1", margin: "0" }}>Reduced at</p>
-  <p style={{ lineHeight: "1", margin: "0" }}>Season End</p>
-</div>
-
-
-
-    </>
-  ) : (
-    <span style={{ top: "60%",  color: "#efb976", fontSize: "25px", fontFamily: "Poetsen One" }}>
-    Member Type
-  </span>
-  
+    
+          {/* FID */}
+          <p
+            style={{
+              position: "absolute",
+              top: "14%",
+              left: "57%",
+              transform: "translateX(-50%)",
+              color: "white",
+              fontSize: "15px",
+              fontWeight: "500",
+            }}
+          >
+            {fid}
+          </p>
+    
+          <p
+            style={{
+              position: "absolute",
+              top: "46%",
+              left: "58%",
+              color: "#ff8c00",
+              fontSize: "33px",
+            }}
+          >
+            {totalPeanutCount}
+          </p>
+    
+         
+          <p
+            style={{
+              position: "absolute",
+              top: "64%",
+              left: "36%",
+              color: "#28a745",
+              fontSize: "33px",
+            }}
+          >
+            {remainingAllowance}
+          </p>
+          <p
+          style={{
+              position: "absolute",
+              top: "46%",
+              left: "40%",
+              color: "#ff8c00",
+              fontSize: "33px",
+            }}
+          >
+            {todayPeanutCount}
+          </p>
+          <p
+          style={{
+              position: "absolute",
+              top: "81%",
+              left: "59%",
+              color: "#ffffff",
+              fontSize: "33px",
+            }}
+          >
+            {usingWallet}
+          </p>
+          <p
+            style={{
+              position: "absolute",
+              top: "64%",
+              left: "58%",
+              color: "#007bff",
+              fontSize: "33px",
+            }}
+          >
+            {userRank}
+          </p>
+          {OGpic >= 1 && (
+    <img
+      src="https://img12.pixhost.to/images/1090/578542519_og-6-copy.png"
+      width="131"
+      height="187"
+      style={{
+        position: "absolute",
+        top: "7.8%",
+        left: "37.5%",
+      }}
+    />
   )}
-</p>
-{reduceEndSeason === 0 && (
-    <img 
-        src="https://img12.pixhost.to/images/870/575350880_tik.png" 
-        alt="No data" 
-        width="80" 
-        height="80" 
-        style={{
-            position: 'absolute',  
-            top: '63%',            
-            left: '85%',          
-        }}
-    />
-)}
-{reduceEndSeason === "og" && (
-    <img 
-        src="https://img12.pixhost.to/images/1016/577511680_og.png" 
-        alt="OG Badge" 
-        width="125" 
-        height="125" 
-        style={{
-          position: 'absolute',  
-          top: '59%',            
-          left: '83%',                 
-        }}
-    />
+  {Usertype === "Member" && (
+  <img
+    src="https://img12.pixhost.to/images/1092/578585661_2.png"
+    width="100"
+    height="100"
+    style={{
+      position: "absolute",
+      top: "25%",
+      left: "66%",
+    }}
+  />
 )}
 
+{Usertype === "Regular" && (
+  <>
+    <img
+      src="https://img12.pixhost.to/images/1093/578590423_1.png"
+      width="100"
+      height="100"
+      style={{
+        position: "absolute",
+        top: "25%",
+        left: "57.5%",
+      }}
+    />
+    <img
+      src="https://img12.pixhost.to/images/1092/578585661_2.png"
+      width="100"
+      height="100"
+      style={{
+        position: "absolute",
+        top: "25%",
+        left: "66%",
+      }}
+    />
+  </>
+)}
+
+
+
+{Usertype === "Active" && (
+  <img
+    src="https://img12.pixhost.to/images/1092/578587015_3.png"
+    width="100"
+    height="100"
+    style={{
+      position: "absolute",
+      top: "25%",
+      left: "49%",
+    }}
+  />
+)}
+
+{(Usertype === "Regular" || Usertype === "Active") && (
+  <>
+    <img
+      src="https://img12.pixhost.to/images/1093/578590423_1.png"
+      width="100"
+      height="100"
+      style={{
+        position: "absolute",
+        top: "25%",
+        left: "57.5%",
+      }}
+    />
+    <img
+      src="https://img12.pixhost.to/images/1092/578585661_2.png"
+      width="100"
+      height="100"
+      style={{
+        position: "absolute",
+        top: "25%",
+        left: "66%",
+      }}
+    />
+  </>
+)}
+
+
+
+          {/* Reduce*/}
+          <p
+            style={{
+              position: "absolute",
+              top: "81%",
+              left: "35%",
+              color: "#ff0000",
+              fontSize: "35px",
+            }}
+          >
+            {reduceEndSeason}
+          </p>
+    
+          {/* Tik */}
+          {reduceEndSeason === "" && (
+            <img
+              src="https://img12.pixhost.to/images/870/575350880_tik.png"
+              alt="No data"
+              width="80"
+              height="80"
+              style={{ position: "absolute", top: "62.5%", left: "84%" }}
+            />
+          )}
         </div>
       ),
+        
       intents: [
         <Button value="my_state">My State</Button>,
         <Button.Link href={composeCastUrl}>Share</Button.Link>,
-        <Button.Link href="https://warpcast.com/basenuts">Join Us</Button.Link>,
         <Button.Link href="https://foundation.app/mint/base/0x8AaB3b53d0F29A3EE07B24Ea253494D03a42e2fB">Be OG</Button.Link>,
+        <Button.Link href="https://foundation.app/mint/base/0x36d4a78d0FB81A16A1349b8f95AF7d5d3CA25081">Allowance</Button.Link>,
       ],
     });
-  } catch (error: unknown) {
+  } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Frame] Render error:', errorMessage);
     return c.res({
@@ -552,6 +777,6 @@ app.frame('/', async (c) => {
   }
 });
 
-const port = process.env.PORT || 3000;
+const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
 serve(app);

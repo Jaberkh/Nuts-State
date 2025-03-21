@@ -1,0 +1,106 @@
+{
+  "holders": [
+    
+    {
+      "wallet": "0x05290e2b3c2cd9ab031eabb03d92735b323a10e6",
+      "count": 1
+    },
+    {
+      "wallet": "0x59479108adfd232aa3f2af184639fa0e08f24dde",
+      "count": 1
+    },
+    {
+      "wallet": "0x1abbb8b03d818dc36322bbb69fadba1beebb68d7",
+      "count": 1
+    },
+    {
+      "wallet": "0x71ad5de3c78abb4162a65a825251f8e76cdcb134",
+      "count": 1
+    },
+    {
+      "wallet": "0xf7b58f3722e09dace9ecfec85465f56e42b5c1d3",
+      "count": 1
+    },
+    {
+      "wallet": "0xb576f95d12f2aba29abd06b02ce79153b9ff5c50",
+      "count": 1
+    },
+    {
+      "wallet": "0x0d36f3b293144d18667823635342e151468fe6f1",
+      "count": 1
+    },
+    {
+      "wallet": "0x219c302f70c6cc9f3aedfbead152c15d3d3a57f6",
+      "count": 1
+    },
+    {
+      "wallet": "0x6a2f6c4c10c8af0f0eee8eea8b7859c2a6000902",
+      "count": 1
+    },
+    {
+      "wallet": "0x964dadfc160aaa79f9d12c51758c5ef7df802869",
+      "count": 1
+    },
+    {
+      "wallet": "0x4a3e6e66f8c32bc05a50879f872b1177a1573cdf",
+      "count": 2
+    },
+    {
+      "wallet": "0x11c3353a1b5813a7d64000d26bed34fb16dd6ec5",
+      "count": 1
+    },
+    {
+      "wallet": "0xb956ac54f8d9aeb7563897f12cc8eaa30c273117",
+      "count": 1
+    },
+    {
+      "wallet": "0xe3135e6a429c6b92f90faef2fc81bc8d148817c7",
+      "count": 1
+    },
+    {
+      "wallet": "0x315a33985ced77111363d842f0a7853f8cf43af9",
+      "count": 1
+    },
+    {
+      "wallet": "0x55ae302943a70c6c28baadc84448d0751aeb25fc",
+      "count": 1
+    },
+    {
+      "wallet": "0x465a3679b985b91b09cc035d9f1bc3bf91947739",
+      "count": 1
+    },
+    {
+      "wallet": "0x953c8fe9742cd89b3ac318b80a36a589d2c3d0ac",
+      "count": 1
+    },
+    {
+      "wallet": "0x8e19969e14cb17bc4fe528073cb3b1683cd74740",
+      "count": 1
+    },
+    {
+      "wallet": "0x0ad5ab29b8aa8a8c7bece5f03cc5efe8a2ab292b",
+      "count": 1
+    },
+    {
+      "wallet": "0x82f038eb068697bb99186e8e5bd66d8cceabd340",
+      "count": 1
+    },
+    {
+      "wallet": "0x7e4f19b5a66b7f9469af32e03cec5fd60febfeb9",
+      "count": 1
+    },
+    {
+      "wallet": "0xae10f77c7aa59d938fdfe97b6d893585fa96e0a4",
+      "count": 1
+    },
+    {
+      "wallet": "0xc99183a86619a1f5045332a3b8db14649a9afd8a",
+      "count": 1
+    },
+    {
+      "wallet": "0xe0bffdf0a2b06096488c6dbbca3c6f38dab0d917",
+      "count": 1
+    }
+  ],
+  "last_updated": 1742546643974
+}
