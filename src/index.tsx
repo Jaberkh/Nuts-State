@@ -424,18 +424,17 @@ async function getUserDataFromCache(fid: string): Promise<{
 
   if (ogNFTCount > 0 || newNFTCount > 0) {
     remainingAllowance = `${maxAllowance}/${Math.max(maxAllowance - sentPeanutCount, 0)}`;
-    const excess = sentPeanutCount > maxAllowance ? sentPeanutCount - maxAllowance : 0;
-    const cumulativeExcess = userRow.cumulativeExcess + excess;
-    reduceEndSeason = ogNFTCount > 0 ? `${cumulativeExcess}` : newNFTCount === 1 ? `member (${cumulativeExcess})` : newNFTCount === 2 ? `regular (${cumulativeExcess})` : `active (${cumulativeExcess})`;
+    reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
     OGpic = ogNFTCount > 0 ? 1 : 0;
   } else {
     if (ALLOW_NON_HOLDERS) {
       remainingAllowance = `${maxAllowance}/${Math.max(maxAllowance - sentPeanutCount, 0)}`;
+      reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
     } else {
       maxAllowance = 0;
       remainingAllowance = 'mint your allowance';
+      reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
     }
-    reduceEndSeason = String(sentPeanutCount);
   }
 
   const existingRowIndex = cache.queries['4837362'].rows.findIndex(row => row.fid === fid);
@@ -758,6 +757,7 @@ app.frame('/', async (c) => {
         
       intents: [
         <Button value="my_state">My State</Button>,
+        <TextInput placeholder="Enter FID to check" />,
         <Button.Link href={composeCastUrl}>Share</Button.Link>,
         <Button.Link href="https://foundation.app/mint/base/0x8AaB3b53d0F29A3EE07B24Ea253494D03a42e2fB">Be OG</Button.Link>,
         <Button.Link href="https://foundation.app/mint/base/0x36d4a78d0FB81A16A1349b8f95AF7d5d3CA25081">Allowance</Button.Link>,
