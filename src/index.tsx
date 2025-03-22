@@ -425,6 +425,7 @@ async function getUserDataFromCache(fid: string): Promise<{
   if (ogNFTCount > 0 || newNFTCount > 0) {
     remainingAllowance = `${maxAllowance} / ${Math.max(maxAllowance - sentPeanutCount, 0)}`;
     reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
+    OGpic=1;
   } else {
     if (ALLOW_NON_HOLDERS) {
       remainingAllowance = `${maxAllowance} / ${Math.max(maxAllowance - sentPeanutCount, 0)}`;
