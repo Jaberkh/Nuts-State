@@ -159,7 +159,7 @@ async function fetchQueryResult(executionId: string, queryId: string): Promise<A
   try {
     const response = await fetch(`https://api.dune.com/api/v1/execution/${executionId}/results`, {
       method: 'GET',
-      headers: { 'X-Dune-API-Key': 'CoMMnwtezMe3cVDY8WC7tLkJpTtlE4JX' }
+      headers: { 'X-Dune-API-Key': 'croXzXynGL2zPt5h4w1esQXARtxge6Q5' }
     });
     if (!response.ok) {
       const errorText = await response.text();
