@@ -138,7 +138,7 @@ async function executeQuery(queryId: string): Promise<string | null> {
   try {
     const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/execute`, {
       method: 'POST',
-      headers: { 'X-Dune-API-Key': 'CoMMnwtezMe3cVDY8WC7tLkJpTtlE4JX' }
+      headers: { 'X-Dune-API-Key': 'croXzXynGL2zPt5h4w1esQXARtxge6Q5' }
     });
     if (!response.ok) {
       const errorText = await response.text();
@@ -423,12 +423,12 @@ async function getUserDataFromCache(fid: string): Promise<{
   maxAllowance = ogAllowance + newAllowance + nonHolderAllowance;
 
   if (ogNFTCount > 0 || newNFTCount > 0) {
-    remainingAllowance = `${maxAllowance}/${Math.max(maxAllowance - sentPeanutCount, 0)}`;
+    remainingAllowance = `${maxAllowance} / ${Math.max(maxAllowance - sentPeanutCount, 0)}`;
     reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
     OGpic = ogNFTCount > 0 ? 1 : 0;
   } else {
     if (ALLOW_NON_HOLDERS) {
-      remainingAllowance = `${maxAllowance}/${Math.max(maxAllowance - sentPeanutCount, 0)}`;
+      remainingAllowance = `${maxAllowance} / ${Math.max(maxAllowance - sentPeanutCount, 0)}`;
       reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
     } else {
       maxAllowance = 0;
@@ -687,7 +687,18 @@ app.frame('/', async (c) => {
   </>
 )}
 
-
+{reduceEndSeason === "" && (
+  <img
+    src="https://img12.pixhost.to/images/870/575350880_tik.png"
+    width="55"
+    height="55"
+    style={{
+      position: "absolute",
+      top: "83%",
+      left: "35%",
+    }}
+  />
+)}
 
 {Usertype === "Active" && (
   <img
@@ -741,23 +752,11 @@ app.frame('/', async (c) => {
           >
             {reduceEndSeason}
           </p>
-    
-          {/* Tik */}
-          {reduceEndSeason === "" && (
-            <img
-              src="https://img12.pixhost.to/images/870/575350880_tik.png"
-              alt="No data"
-              width="80"
-              height="80"
-              style={{ position: "absolute", top: "62.5%", left: "84%" }}
-            />
-          )}
         </div>
       ),
         
       intents: [
         <Button value="my_state">My State</Button>,
-        <TextInput placeholder="Enter FID to check" />,
         <Button.Link href={composeCastUrl}>Share</Button.Link>,
         <Button.Link href="https://foundation.app/mint/base/0x8AaB3b53d0F29A3EE07B24Ea253494D03a42e2fB">Be OG</Button.Link>,
         <Button.Link href="https://foundation.app/mint/base/0x36d4a78d0FB81A16A1349b8f95AF7d5d3CA25081">Allowance</Button.Link>,
