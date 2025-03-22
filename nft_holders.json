@@ -1,6 +1,5 @@
 {
   "holders": [
-
     {
       "wallet": "0x05290e2b3c2cd9ab031eabb03d92735b323a10e6",
       "count": 1
@@ -11,7 +10,7 @@
     },
     {
       "wallet": "0x1abbb8b03d818dc36322bbb69fadba1beebb68d7",
-      "count": 1
+      "count": 2
     },
     {
       "wallet": "0x71ad5de3c78abb4162a65a825251f8e76cdcb134",
@@ -62,7 +61,7 @@
       "count": 1
     },
     {
-      "wallet": "0x55ae302943a70c6c28baadc84448d0751aeb25fc",
+      "wallet": "0x32f04b3a5fb66636e472518fef6e509b59bed009",
       "count": 1
     },
     {
@@ -75,6 +74,10 @@
     },
     {
       "wallet": "0xd9ec42b478ad5071e1ac4dab73ccf7ed7af689f3",
+      "count": 1
+    },
+    {
+      "wallet": "0xc686046b9dcd0fca3a6acbac315b419df030cb3e",
       "count": 1
     },
     {
@@ -106,5 +109,5 @@
       "count": 1
     }
   ],
-  "last_updated": 1742628422757
+  "last_updated": 1742675894153
 }
