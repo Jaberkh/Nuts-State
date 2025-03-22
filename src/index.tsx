@@ -411,9 +411,19 @@ async function getUserDataFromCache(fid: string): Promise<{
 
   const ogNFTCount = await isOGNFTHolder(fid);
   const newNFTCount = await isNewNFTHolder(fid);
-if(ogNFTCount>0){
-  OGpic=1;
-}
+
+  // تنظیم متغیرهای OGpic و Usertype برای استفاده در رندر بج‌ها
+  OGpic = ogNFTCount; // تعداد OG NFTها
+  if (newNFTCount === 1) {
+    Usertype = "Member";
+  } else if (newNFTCount === 2) {
+    Usertype = "Regular";
+  } else if (newNFTCount >= 3) {
+    Usertype = "Active";
+  } else {
+    Usertype = "Noobie";
+  }
+
   let maxAllowance: number;
   let remainingAllowance: string;
   let reduceEndSeason = '';
@@ -427,7 +437,6 @@ if(ogNFTCount>0){
   if (ogNFTCount > 0 || newNFTCount > 0) {
     remainingAllowance = `${maxAllowance} / ${Math.max(maxAllowance - sentPeanutCount, 0)}`;
     reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
-    
   } else {
     if (ALLOW_NON_HOLDERS) {
       remainingAllowance = `${maxAllowance} / ${Math.max(maxAllowance - sentPeanutCount, 0)}`;
@@ -444,16 +453,6 @@ if(ogNFTCount>0){
     cache.queries['4837362'].rows[existingRowIndex].cumulativeExcess = userRow.cumulativeExcess + (sentPeanutCount > maxAllowance ? sentPeanutCount - maxAllowance : 0);
   } else if (existingRowIndex === -1 && (ogNFTCount > 0 || newNFTCount > 0)) {
     cache.queries['4837362'].rows.push({ fid, data: userData, cumulativeExcess: sentPeanutCount > maxAllowance ? sentPeanutCount - maxAllowance : 0 });
-  }
-
-  if (newNFTCount === 1) {
-    Usertype = "Member";
-  } else if (newNFTCount === 2) {
-    Usertype = "Regular";
-  } else if (newNFTCount >= 3) {
-    Usertype = "Active";
-  } else if (newNFTCount <= 0) {
-    Usertype = "Noobie";
   }
 
   const userRank = userData.rank || 0;
@@ -504,7 +503,7 @@ app.frame('/', async (c) => {
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent('Check out your 🥜 stats! \n\n Frame by @arsalang.eth & @jeyloo.eth ')}&embeds[]=${encodeURIComponent(frameUrl)}`;
 
   try {
-    console.log("usertype:" , Usertype);
+    console.log("usertype:", Usertype);
     
     return c.res({
       image: (
@@ -535,7 +534,7 @@ app.frame('/', async (c) => {
             }}
           />
     
-          {/* Pfp Url*/}
+          {/* Pfp Url */}
           {pfpUrl && (
             <img
               src={pfpUrl}
@@ -594,7 +593,6 @@ app.frame('/', async (c) => {
             {totalPeanutCount}
           </p>
     
-         
           <p
             style={{
               position: "absolute",
@@ -607,7 +605,7 @@ app.frame('/', async (c) => {
             {remainingAllowance}
           </p>
           <p
-          style={{
+            style={{
               position: "absolute",
               top: "46%",
               left: "40%",
@@ -618,7 +616,7 @@ app.frame('/', async (c) => {
             {todayPeanutCount}
           </p>
           <p
-          style={{
+            style={{
               position: "absolute",
               top: "81%",
               left: "59%",
@@ -639,110 +637,79 @@ app.frame('/', async (c) => {
           >
             {userRank}
           </p>
-          { OGpic>0 && (
-    <img
-      src="https://img12.pixhost.to/images/1090/578542519_og-6-copy.png"
-      width="131"
-      height="187"
-      style={{
-        position: "absolute",
-        top: "7.8%",
-        left: "37.5%",
-      }}
-    />
-  )}
-  {Usertype === "Member" && (
-  <img
-    src="https://img12.pixhost.to/images/1092/578585661_2.png"
-    width="100"
-    height="100"
-    style={{
-      position: "absolute",
-      top: "25%",
-      left: "66%",
-    }}
-  />
-)}
 
-{Usertype === "Regular" && (
-  <>
-    <img
-      src="https://img12.pixhost.to/images/1093/578590423_1.png"
-      width="100"
-      height="100"
-      style={{
-        position: "absolute",
-        top: "25%",
-        left: "57.5%",
-      }}
-    />
-    <img
-      src="https://img12.pixhost.to/images/1092/578585661_2.png"
-      width="100"
-      height="100"
-      style={{
-        position: "absolute",
-        top: "25%",
-        left: "66%",
-      }}
-    />
-  </>
-)}
+          {/* نمایش بج‌ها بر اساس شرایط جدید */}
+          {/* بج OG: اگر هولدر حداقل 1 NFT نوع OG داشته باشه */}
+          {OGpic > 0 && (
+            <img
+              src="https://img12.pixhost.to/images/1090/578542519_og-6-copy.png"
+              width="131"
+              height="187"
+              style={{
+                position: "absolute",
+                top: "7.8%",
+                left: "37.5%",
+              }}
+            />
+          )}
 
-{reduceEndSeason === "" && (
-  <img
-    src="https://img12.pixhost.to/images/870/575350880_tik.png"
-    width="55"
-    height="55"
-    style={{
-      position: "absolute",
-      top: "83%",
-      left: "35%",
-    }}
-  />
-)}
+          {/* بج Member: اگر هولدر حداقل 1 NFT نوع New داشته باشه */}
+          {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
+            <img
+              src="https://img12.pixhost.to/images/1092/578585661_2.png"
+              width="100"
+              height="100"
+              style={{
+                position: "absolute",
+                top: "25%",
+                left: "66%",
+              }}
+            />
+          )}
 
-{Usertype === "Active" && (
-  <img
-    src="https://img12.pixhost.to/images/1092/578587015_3.png"
-    width="100"
-    height="100"
-    style={{
-      position: "absolute",
-      top: "25%",
-      left: "49%",
-    }}
-  />
-)}
+          {/* بج Regular: اگر هولدر حداقل 2 NFT نوع New داشته باشه */}
+          {(Usertype === "Regular" || Usertype === "Active") && (
+            <img
+              src="https://img12.pixhost.to/images/1093/578590423_1.png"
+              width="100"
+              height="100"
+              style={{
+                position: "absolute",
+                top: "25%",
+                left: "57.5%",
+              }}
+            />
+          )}
 
-{(Usertype === "Regular" || Usertype === "Active") && (
-  <>
-    <img
-      src="https://img12.pixhost.to/images/1093/578590423_1.png"
-      width="100"
-      height="100"
-      style={{
-        position: "absolute",
-        top: "25%",
-        left: "57.5%",
-      }}
-    />
-    <img
-      src="https://img12.pixhost.to/images/1092/578585661_2.png"
-      width="100"
-      height="100"
-      style={{
-        position: "absolute",
-        top: "25%",
-        left: "66%",
-      }}
-    />
-  </>
-)}
+          {/* بج Active: اگر هولدر 3 یا بیشتر NFT نوع New داشته باشه */}
+          {Usertype === "Active" && (
+            <img
+              src="https://img12.pixhost.to/images/1092/578587015_3.png"
+              width="100"
+              height="100"
+              style={{
+                position: "absolute",
+                top: "25%",
+                left: "49%",
+              }}
+            />
+          )}
 
+          {/* نمایش تیک در صورت عدم وجود Reduce End Season */}
+          {reduceEndSeason === "" && (
+            <img
+              src="https://img12.pixhost.to/images/870/575350880_tik.png"
+              width="55"
+              height="55"
+              style={{
+                position: "absolute",
+                top: "83%",
+                left: "35%",
+              }}
+            />
+          )}
 
-
-          {/* Reduce*/}
+          {/* Reduce */}
           <p
             style={{
               position: "absolute",
