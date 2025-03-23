@@ -523,7 +523,7 @@ app.frame('/', async (c) => {
         >
           {/* BG */}
           <img
-            src="https://img12.pixhost.to/images/1086/578480364_bg.png"
+            src="https://img12.pixhost.to/images/1135/579348089_bg.png"
             style={{
               width: "100%",
               height: "100%",
