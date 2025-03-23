@@ -15,7 +15,11 @@
     {
       "wallet": "0xb80522abbd522c2fa5c55c6d8da14150fdfb2bdf",
       "count": 1
+    },
+    {
+      "wallet": "0xe0bffdf0a2b06096488c6dbbca3c6f38dab0d917",
+      "count": 1
     }
   ],
-  "last_updated": 1742720863112
+  "last_updated": 1742740210852
 }
