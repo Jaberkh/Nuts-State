@@ -124,9 +124,8 @@ console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
 
 export const app = new Frog({
-    imageAspectRatio : '1:1',
-    title: 'Nuts State',
-  
+  imageAspectRatio: '1:1',
+  title: 'Nuts State',
   imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
 });
 
@@ -218,8 +217,7 @@ function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const updateTimes = [0, 360, 600, 1020, 1260];
-
+  const updateTimes = [180, 353, 625, 1080, 1260];
 
   if (isCacheEmpty) {
     console.log(`[UpdateCheck] Cache is empty. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
@@ -335,37 +333,39 @@ function scheduleUpdates() {
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
 
-async function getWalletAddressFromFid(fid: string): Promise<string | null> {
-  console.log(`[Neynar] Fetching wallet address for FID ${fid}`);
+async function getWalletAddressFromFid(fid: string): Promise<{ wallet1: string | null; wallet2: string | null }> {
+  console.log(`[Neynar] Fetching verified wallet addresses for FID ${fid}`);
   if (fid === 'N/A') {
     console.log('[Neynar] FID is N/A, skipping request');
-    return null;
+    return { wallet1: null, wallet2: null };
   }
   try {
     const response = await client.fetchBulkUsers({ fids: [Number(fid)] });
     const user = response.users[0];
-    const walletAddress = user?.verified_addresses?.eth_addresses?.[0] || user?.custody_address;
-    console.log(`[Neynar] Wallet address for FID ${fid}: ${walletAddress}`);
-    return walletAddress || null;
+    const ethAddresses = user?.verified_addresses?.eth_addresses || [];
+    const wallet1 = ethAddresses[0] || null; // آدرس وریفاید اول
+    const wallet2 = ethAddresses[1] || null; // آدرس وریفاید دوم (اگه باشه)
+    console.log(`[Neynar] Verified wallets for FID ${fid}: Wallet1: ${wallet1}, Wallet2: ${wallet2}`);
+    return { wallet1, wallet2 };
   } catch (error) {
-    console.error(`[Neynar] Error fetching wallet address: ${error}`);
-    return null;
+    console.error(`[Neynar] Error fetching verified wallet addresses: ${error}`);
+    return { wallet1: null, wallet2: null };
   }
 }
 
 async function isOGNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds OG NFT from ${OG_NFT_CONTRACT_ADDRESS} using offline data`);
   try {
-    const walletAddress = await getWalletAddressFromFid(fid);
-    if (!walletAddress) {
+    const { wallet1 } = await getWalletAddressFromFid(fid);
+    if (!wallet1) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
     }
     const holdersData = await fs.readFile(ogHoldersFile, 'utf8');
     const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
-    const holder = holders.find(h => h.wallet.toLowerCase() === walletAddress.toLowerCase());
+    const holder = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
     const count = holder ? holder.count : 0;
-    console.log(`[NFT] FID ${fid} (Wallet: ${walletAddress}) holds ${count} OG NFTs`);
+    console.log(`[NFT] FID ${fid} (Wallet: ${wallet1}) holds ${count} OG NFTs`);
     return count;
   } catch (error) {
     console.error(`[NFT] Error checking OG holder status offline: ${error}`);
@@ -376,16 +376,16 @@ async function isOGNFTHolder(fid: string): Promise<number> {
 async function isNewNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds New NFT from ${NEW_NFT_CONTRACT_ADDRESS} using offline data`);
   try {
-    const walletAddress = await getWalletAddressFromFid(fid);
-    if (!walletAddress) {
+    const { wallet1 } = await getWalletAddressFromFid(fid);
+    if (!wallet1) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
     }
     const holdersData = await fs.readFile(newHoldersFile, 'utf8');
     const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
-    const holder = holders.find(h => h.wallet.toLowerCase() === walletAddress.toLowerCase());
+    const holder = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
     const count = holder ? holder.count : 0;
-    console.log(`[NFT] FID ${fid} (Wallet: ${walletAddress}) holds ${count} New NFTs`);
+    console.log(`[NFT] FID ${fid} (Wallet: ${wallet1}) holds ${count} New NFTs`);
     return count;
   } catch (error) {
     console.error(`[NFT] Error checking New NFT holder status offline: ${error}`);
@@ -400,7 +400,10 @@ async function getUserDataFromCache(fid: string): Promise<{
   remainingAllowance: string;
   userRank: number;
   reduceEndSeason: string;
-  usingWallet: string;
+  verifiedWallet1: string;
+  verifiedWallet2: string;
+  warpcastVerifiedLink1: string;
+  warpcastVerifiedLink2: string;
 }> {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
   const userRow = cache.queries['4837362'].rows.find((row) => row.fid === fid) || { data: {}, cumulativeExcess: 0 };
@@ -413,8 +416,7 @@ async function getUserDataFromCache(fid: string): Promise<{
   const ogNFTCount = await isOGNFTHolder(fid);
   const newNFTCount = await isNewNFTHolder(fid);
 
-  // تنظیم متغیرهای OGpic و Usertype برای استفاده در رندر بج‌ها
-  OGpic = ogNFTCount; // تعداد OG NFTها
+  OGpic = ogNFTCount;
   if (newNFTCount === 1) {
     Usertype = "Member";
   } else if (newNFTCount === 2) {
@@ -429,7 +431,6 @@ async function getUserDataFromCache(fid: string): Promise<{
   let remainingAllowance: string;
   let reduceEndSeason = '';
 
-  // محاسبه الوانس کل با جمع OG و NEW
   const ogAllowance = ogNFTCount * 150;
   const newAllowance = newNFTCount === 1 ? 30 : newNFTCount === 2 ? 45 : newNFTCount >= 3 ? 60 : 0;
   const nonHolderAllowance = (ogNFTCount === 0 && newNFTCount === 0 && ALLOW_NON_HOLDERS) ? 30 : 0;
@@ -445,7 +446,7 @@ async function getUserDataFromCache(fid: string): Promise<{
     } else {
       maxAllowance = 0;
       remainingAllowance = 'mint your allowance';
-      reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
+      reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : ''; // اینجا carbs رو با '' عوض کردم
     }
   }
 
@@ -457,11 +458,15 @@ async function getUserDataFromCache(fid: string): Promise<{
   }
 
   const userRank = userData.rank || 0;
-  const walletAddress = await getWalletAddressFromFid(fid);
-  const usingWallet = walletAddress ? `${walletAddress.slice(0, 3)}...${walletAddress.slice(-3)}` : 'N/A';
 
-  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}, UsingWallet: ${usingWallet}`);
-  return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, usingWallet };
+  const { wallet1, wallet2 } = await getWalletAddressFromFid(fid);
+  const verifiedWallet1 = wallet1 ? `${wallet1.slice(0, 3)}...${wallet1.slice(-3)}` : 'N/A';
+  const verifiedWallet2 = wallet2 ? `${wallet2.slice(0, 3)}...${wallet2.slice(-3)}` : 'N/A';
+  const warpcastVerifiedLink1 = wallet1 ? `https://warpcast.com/~/profile/${fid}` : 'N/A';
+  const warpcastVerifiedLink2 = wallet2 ? `https://warpcast.com/~/profile/${fid}` : 'N/A';
+
+  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}, VerifiedWallet1: ${verifiedWallet1}, VerifiedWallet2: ${verifiedWallet2}`);
+  return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, verifiedWallet1, verifiedWallet2, warpcastVerifiedLink1, warpcastVerifiedLink2 };
 }
 
 app.frame('/', async (c) => {
@@ -498,7 +503,7 @@ app.frame('/', async (c) => {
   const username = urlParams.get("username") || interactor.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
 
-  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, usingWallet } = await getUserDataFromCache(fid);
+  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, verifiedWallet1, verifiedWallet2, warpcastVerifiedLink1, warpcastVerifiedLink2 } = await getUserDataFromCache(fid);
   const hashId = await getOrGenerateHashId(fid);
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent('Check out your 🥜 stats! \n\n Frame by @arsalang.eth & @jeyloo.eth ')}&embeds[]=${encodeURIComponent(frameUrl)}`;
@@ -522,9 +527,8 @@ app.frame('/', async (c) => {
             overflow: "hidden",
           }}
         >
-          {/* BG */}
           <img
-            src="https://img12.pixhost.to/images/1135/579348089_bg.png"
+            src="https://img12.pixhost.to/images/1164/579756197_bg.png"
             style={{
               width: "100%",
               height: "100%",
@@ -535,10 +539,9 @@ app.frame('/', async (c) => {
             }}
           />
     
-          {/* Pfp Url */}
           {pfpUrl && (
             <img
-              src={pfpUrl}
+              src={anticURLSanitize(pfpUrl)}
               alt="Profile Picture"
               style={{
                 width: "160px",
@@ -552,7 +555,6 @@ app.frame('/', async (c) => {
             />
           )}
     
-          {/* Username */}
           <p
             style={{
               position: "absolute",
@@ -567,7 +569,6 @@ app.frame('/', async (c) => {
             {username}
           </p>
     
-          {/* FID */}
           <p
             style={{
               position: "absolute",
@@ -619,13 +620,24 @@ app.frame('/', async (c) => {
           <p
             style={{
               position: "absolute",
-              top: "81%",
-              left: "59%",
+              top: "80%",
+              left: "62%",
               color: "#ffffff",
-              fontSize: "33px",
+              fontSize: "23px",
             }}
           >
-            {usingWallet}
+            {verifiedWallet1}
+          </p>
+          <p
+            style={{
+              position: "absolute",
+              top: "85%",
+              left: "62%",
+              color: "#ffffff",
+              fontSize: "23px",
+            }}
+          >
+             {verifiedWallet2}
           </p>
           <p
             style={{
@@ -639,8 +651,6 @@ app.frame('/', async (c) => {
             {userRank}
           </p>
 
-          {/* نمایش بج‌ها بر اساس شرایط جدید */}
-          {/* بج OG: اگر هولدر حداقل 1 NFT نوع OG داشته باشه */}
           {OGpic > 0 && (
             <img
               src="https://img12.pixhost.to/images/1090/578542519_og-6-copy.png"
@@ -653,8 +663,6 @@ app.frame('/', async (c) => {
               }}
             />
           )}
-
-          {/* بج Member: اگر هولدر حداقل 1 NFT نوع New داشته باشه */}
           {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
             <img
               src="https://img12.pixhost.to/images/1092/578585661_2.png"
@@ -667,8 +675,6 @@ app.frame('/', async (c) => {
               }}
             />
           )}
-
-          {/* بج Regular: اگر هولدر حداقل 2 NFT نوع New داشته باشه */}
           {(Usertype === "Regular" || Usertype === "Active") && (
             <img
               src="https://img12.pixhost.to/images/1093/578590423_1.png"
@@ -681,8 +687,6 @@ app.frame('/', async (c) => {
               }}
             />
           )}
-
-          {/* بج Active: اگر هولدر 3 یا بیشتر NFT نوع New داشته باشه */}
           {Usertype === "Active" && (
             <img
               src="https://img12.pixhost.to/images/1092/578587015_3.png"
@@ -695,8 +699,6 @@ app.frame('/', async (c) => {
               }}
             />
           )}
-
-          {/* نمایش تیک در صورت عدم وجود Reduce End Season */}
           {reduceEndSeason === "" && (
             <img
               src="https://img12.pixhost.to/images/870/575350880_tik.png"
@@ -709,8 +711,6 @@ app.frame('/', async (c) => {
               }}
             />
           )}
-
-          {/* Reduce */}
           <p
             style={{
               position: "absolute",
@@ -724,7 +724,6 @@ app.frame('/', async (c) => {
           </p>
         </div>
       ),
-        
       intents: [
         <Button value="my_state">My State</Button>,
         <Button.Link href={composeCastUrl}>Share</Button.Link>,
@@ -745,6 +744,16 @@ app.frame('/', async (c) => {
     });
   }
 });
+
+function anticURLSanitize(url: string): string {
+  const decodedURL = decodeURIComponent(url);
+  const cleanURL = decodedURL.replace(/[<>"'`;]/g, "");
+  const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i;
+  if (!urlPattern.test(cleanURL)) {
+    return "";
+  }
+  return cleanURL;
+}
 
 const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
