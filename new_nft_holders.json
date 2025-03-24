@@ -23,7 +23,11 @@
     {
       "wallet": "0xae10f77c7aa59d938fdfe97b6d893585fa96e0a4",
       "count": 1
+    },
+    {
+      "wallet": "0x58cb89c8bbab3ff6b025fc140979cae5da7a53dd",
+      "count": 1
     }
   ],
-  "last_updated": 1742808028142
+  "last_updated": 1742814573627
 }
