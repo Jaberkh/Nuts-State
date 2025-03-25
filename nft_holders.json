@@ -2,7 +2,7 @@
   "holders": [
     {
       "wallet": "0x05290e2b3c2cd9ab031eabb03d92735b323a10e6",
-      "count": 1
+      "count": 2
     },
     {
       "wallet": "0x59479108adfd232aa3f2af184639fa0e08f24dde",
@@ -109,5 +109,5 @@
       "count": 1
     }
   ],
-  "last_updated": 1742896915045
+  "last_updated": 1742906776103
 }
