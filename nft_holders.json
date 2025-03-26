@@ -78,10 +78,14 @@
     },
     {
       "wallet": "0xc686046b9dcd0fca3a6acbac315b419df030cb3e",
-      "count": 1
+      "count": 2
     },
     {
       "wallet": "0x8e19969e14cb17bc4fe528073cb3b1683cd74740",
+      "count": 1
+    },
+    {
+      "wallet": "0x75afacac743769c517726064722737d75bb501e4",
       "count": 1
     },
     {
@@ -109,5 +113,5 @@
       "count": 1
     }
   ],
-  "last_updated": 1742920409480
+  "last_updated": 1742967444572
 }

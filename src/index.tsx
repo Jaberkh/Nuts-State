@@ -137,7 +137,7 @@ async function executeQuery(queryId: string): Promise<string | null> {
   try {
     const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/execute`, {
       method: 'POST',
-      headers: { 'X-Dune-API-Key': 'croXzXynGL2zPt5h4w1esQXARtxge6Q5' }
+      headers: { 'X-Dune-API-Key': 'bh4DqebSfqLJeB8F3JGoY6aSbxonsj8Q' }
     });
     if (!response.ok) {
       const errorText = await response.text();
@@ -158,7 +158,7 @@ async function fetchQueryResult(executionId: string, queryId: string): Promise<A
   try {
     const response = await fetch(`https://api.dune.com/api/v1/execution/${executionId}/results`, {
       method: 'GET',
-      headers: { 'X-Dune-API-Key': 'croXzXynGL2zPt5h4w1esQXARtxge6Q5' }
+      headers: { 'X-Dune-API-Key': 'bh4DqebSfqLJeB8F3JGoY6aSbxonsj8Q' }
     });
     if (!response.ok) {
       const errorText = await response.text();
