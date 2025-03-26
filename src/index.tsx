@@ -217,7 +217,7 @@ function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const updateTimes = [180, 353, 625, 1080, 1260];
+  const updateTimes = [0];
 
   if (isCacheEmpty) {
     console.log(`[UpdateCheck] Cache is empty. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
