@@ -546,8 +546,8 @@ app.frame('/', async (c) => {
           <img
             src="https://i.imgur.com/CD7K8ps.png"
             style={{
-              width: "100%",
-              height: "100%",
+              width: "1000",
+              height: "1000",
               objectFit: "contain",
               position: "absolute",
               top: 0,
