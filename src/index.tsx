@@ -773,4 +773,6 @@ function anticURLSanitize(url: string): string {
 
 const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
-serve(app);
+
+const server = serve(app);
+server.setTimeout(30000);
