@@ -137,7 +137,7 @@ async function executeQuery(queryId: string): Promise<string | null> {
   try {
     const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/execute`, {
       method: 'POST',
-      headers: { 'X-Dune-API-Key': 'bh4DqebSfqLJeB8F3JGoY6aSbxonsj8Q' }
+      headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
     });
     if (!response.ok) {
       const errorText = await response.text();
@@ -158,7 +158,7 @@ async function fetchQueryResult(executionId: string, queryId: string): Promise<A
   try {
     const response = await fetch(`https://api.dune.com/api/v1/execution/${executionId}/results`, {
       method: 'GET',
-      headers: { 'X-Dune-API-Key': 'bh4DqebSfqLJeB8F3JGoY6aSbxonsj8Q' }
+      headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
     });
     if (!response.ok) {
       const errorText = await response.text();
@@ -544,7 +544,7 @@ app.frame('/', async (c) => {
           }}
         >
           <img
-            src="https://img12.pixhost.to/images/1205/580458275_bg2.png"
+            src="https://i.ibb.co/rGGTThmv/BG.png"
             style={{
               width: "100%",
               height: "100%",
