@@ -40,7 +40,7 @@ let cache: {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 6;
+const MAX_RPS = 7;
 const MAX_RPM = 300;
 const LOAD_THRESHOLD = 4;
 const SECOND_DURATION = 1000;
@@ -524,9 +524,6 @@ app.frame('/', async (c) => {
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent('Check out your 🥜 stats! \n\n Frame by @arsalang.eth & @jeyloo.eth ')}&embeds[]=${encodeURIComponent(frameUrl)}`;
 
-  const baseUrl = c.req.url.split('?')[0]; // Get the base URL of the request
-  const imageBaseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash if present
-
   try {
     console.log("usertype:", Usertype);
     
@@ -547,7 +544,7 @@ app.frame('/', async (c) => {
           }}
         >
           <img
-            src={`${imageBaseUrl}/bg.png`}
+            src="/bg.png"
             style={{
               width: "100%",
               height: "100%",
@@ -672,7 +669,7 @@ app.frame('/', async (c) => {
 
           {OGpic > 0 && (
             <img
-              src={`${imageBaseUrl}/og.png`}
+              src="/og.png"
               width="131"
               height="187"
               style={{
@@ -684,7 +681,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src={`${imageBaseUrl}/member.png`}
+              src="/member.png"
               width="100"
               height="100"
               style={{
@@ -696,7 +693,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src={`${imageBaseUrl}/regular.png`}
+              src="/regular.png"
               width="100"
               height="100"
               style={{
@@ -708,7 +705,7 @@ app.frame('/', async (c) => {
           )}
           {Usertype === "Active" && (
             <img
-              src={`${imageBaseUrl}/active.png`}
+              src="/active.png"
               width="100"
               height="100"
               style={{
@@ -720,7 +717,7 @@ app.frame('/', async (c) => {
           )}
           {reduceEndSeason === "" && (
             <img
-              src="https://img12.pixhost.to/images/870/575350880_tik.png"
+              src="/tik.png"
               width="55"
               height="55"
               style={{
