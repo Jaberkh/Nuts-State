@@ -124,47 +124,13 @@ console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
 
 export const app = new Frog({
-  imageOptions: { 
-    width: 800,
-    height: 800,
-    debug: true
-  },
   imageAspectRatio: '1:1',
-  title: 'Nuts State'
+  title: 'Nuts State',
+  imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
 });
 
 app.use(neynar({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17', features: ['interactor', 'cast'] }));
-app.use('/*', serveStatic({ 
-  root: './public',
-  rewriteRequestPath: (path) => {
-    if (path === '/image' || path === '/og-image') {
-      return '/bg.png';
-    }
-    return path;
-  }
-}));
-
-app.use('*.png', async (c, next) => {
-  try {
-    c.header('Content-Type', 'image/png');
-    c.header('Cache-Control', 'public, max-age=3600');
-    c.header('Access-Control-Allow-Origin', '*');
-    await next();
-  } catch (err) {
-    console.error('[Image Error]', err);
-    return c.text('Image not found', 404);
-  }
-});
-
-app.use('*', async (c, next) => {
-  const start = Date.now();
-  console.log(`[Request] Start: ${c.req.path}`);
-  try {
-    await next();
-  } finally {
-    console.log(`[Request] End: ${c.req.path}, Duration: ${Date.now() - start}ms`);
-  }
-});
+app.use('/*', serveStatic({ root: './public' }));
 
 async function executeQuery(queryId: string): Promise<string | null> {
   console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount}) - 1 credit consumed`);
@@ -808,8 +774,4 @@ function anticURLSanitize(url: string): string {
 const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
 
-serve({
-  fetch: app.fetch,
-  port: port,
-  hostname: '0.0.0.0'  // Listen on all available network interfaces
-});
+serve(app);
