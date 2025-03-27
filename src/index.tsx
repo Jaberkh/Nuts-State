@@ -524,6 +524,9 @@ app.frame('/', async (c) => {
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent('Check out your 🥜 stats! \n\n Frame by @arsalang.eth & @jeyloo.eth ')}&embeds[]=${encodeURIComponent(frameUrl)}`;
 
+  const baseUrl = c.req.url.split('?')[0]; // Get the base URL of the request
+  const imageBaseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash if present
+
   try {
     console.log("usertype:", Usertype);
     
@@ -544,7 +547,7 @@ app.frame('/', async (c) => {
           }}
         >
           <img
-            src="/bg.png"
+            src={`${imageBaseUrl}/bg.png`}
             style={{
               width: "100%",
               height: "100%",
@@ -669,7 +672,7 @@ app.frame('/', async (c) => {
 
           {OGpic > 0 && (
             <img
-              src="/og.png"
+              src={`${imageBaseUrl}/og.png`}
               width="131"
               height="187"
               style={{
@@ -681,7 +684,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="member.png"
+              src={`${imageBaseUrl}/member.png`}
               width="100"
               height="100"
               style={{
@@ -693,7 +696,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="regular.png"
+              src={`${imageBaseUrl}/regular.png`}
               width="100"
               height="100"
               style={{
@@ -705,7 +708,7 @@ app.frame('/', async (c) => {
           )}
           {Usertype === "Active" && (
             <img
-              src="active.png"
+              src={`${imageBaseUrl}/active.png`}
               width="100"
               height="100"
               style={{
@@ -717,7 +720,7 @@ app.frame('/', async (c) => {
           )}
           {reduceEndSeason === "" && (
             <img
-              src="https://img12.pixhost.to/images/870/575350880_tik.png"
+              src={`${imageBaseUrl}/tik.png`}
               width="55"
               height="55"
               style={{
