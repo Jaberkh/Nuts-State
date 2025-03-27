@@ -40,7 +40,7 @@ let cache: {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 7;
+const MAX_RPS = 5;
 const MAX_RPM = 300;
 const LOAD_THRESHOLD = 4;
 const SECOND_DURATION = 1000;
@@ -130,7 +130,72 @@ export const app = new Frog({
 });
 
 app.use(neynar({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17', features: ['interactor', 'cast'] }));
-app.use('/*', serveStatic({ root: './public' }));
+app.use('/*', serveStatic({ 
+  root: './public',
+  rewriteRequestPath: (path) => {
+    if (path === '/image' || path === '/og-image') {
+      return '/bg.png';
+    }
+    return path;
+  }
+}));
+
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  console.log(`[Request] Start: ${c.req.path}`);
+  
+  try {
+    // Set timeout for the request
+    const timeout = setTimeout(() => {
+      console.error(`[Request] Timeout for ${c.req.path}`);
+      return c.text('Request timeout', 504);
+    }, 25000); // 25 second timeout
+
+    await next();
+
+    clearTimeout(timeout);
+    console.log(`[Request] End: ${c.req.path}, Duration: ${Date.now() - start}ms`);
+  } catch (error) {
+    console.error(`[Request] Error for ${c.req.path}:`, error);
+    return c.text('Internal Server Error', 500);
+  }
+});
+
+// Add specific handling for image requests
+app.use('*.png', async (c, next) => {
+  try {
+    c.header('Content-Type', 'image/png');
+    c.header('Cache-Control', 'public, max-age=3600');
+    c.header('Access-Control-Allow-Origin', '*');
+    await next();
+  } catch (error) {
+    console.error('[Image] Error serving image:', error);
+    return c.text('Image not found', 404);
+  }
+});
+
+// Add specific handling for frame requests
+app.use('/frame', async (c, next) => {
+  try {
+    c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+    c.header('Pragma', 'no-cache');
+    c.header('Expires', '0');
+    await next();
+  } catch (error) {
+    console.error('[Frame] Error handling frame request:', error);
+    return c.text('Frame generation error', 500);
+  }
+});
+
+// Add error handling middleware
+app.use('*', async (c, next) => {
+  try {
+    await next();
+  } catch (error) {
+    console.error('[Error] Unhandled error:', error);
+    return c.text('Internal Server Error', 500);
+  }
+});
 
 async function executeQuery(queryId: string): Promise<string | null> {
   console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount}) - 1 credit consumed`);
@@ -771,7 +836,21 @@ function anticURLSanitize(url: string): string {
   return cleanURL;
 }
 
-const port: number = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
 
-serve(app);
+// Add process error handlers
+process.on('uncaughtException', (error: Error) => {
+  console.error('[Server] Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+  console.error('[Server] Unhandled Rejection:', reason);
+});
+
+// Start server with basic configuration
+serve({
+  fetch: app.fetch,
+  port: port,
+  hostname: '0.0.0.0'
+});
