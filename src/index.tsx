@@ -40,7 +40,7 @@ let cache: {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 5;
+const MAX_RPS = 6;
 const MAX_RPM = 300;
 const LOAD_THRESHOLD = 4;
 const SECOND_DURATION = 1000;
@@ -61,10 +61,6 @@ const ALLOW_NON_HOLDERS = true;
 const config = new Configuration({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17' });
 const client = new NeynarAPIClient(config);
 
-// کش برای هولدرهای NFT
-let ogHoldersCache: NFTHolder[] | null = null;
-let newHoldersCache: NFTHolder[] | null = null;
-
 // راه‌اندازی Moralis
 console.log('[Moralis] Initializing Moralis SDK');
 Moralis.start({ apiKey: MORALIS_API_KEY }).then(() => {
@@ -73,7 +69,7 @@ Moralis.start({ apiKey: MORALIS_API_KEY }).then(() => {
   console.error('[Moralis] Error initializing Moralis SDK:', error);
 });
 
-// توابع کمکی
+// توابع
 function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   const now = Date.now();
   while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
@@ -124,146 +120,30 @@ async function saveCache() {
   console.log(`[Cache] Cache saved to cache.json with ${cache.queries['4837362'].rows.length} rows`);
 }
 
-async function loadOGHolders(): Promise<NFTHolder[]> {
-  if (ogHoldersCache !== null) return ogHoldersCache;
-  console.log('[Cache] Loading OG holders from file');
-  try {
-    const holdersData = await fs.readFile(ogHoldersFile, 'utf8');
-    ogHoldersCache = JSON.parse(holdersData).holders as NFTHolder[];
-    if (!ogHoldersCache) {
-      console.error('[Cache] Failed to load OG holders, defaulting to empty array');
-      ogHoldersCache = [];
-    }
-    console.log(`[Cache] Loaded ${ogHoldersCache.length} OG holders into memory`);
-    return ogHoldersCache;
-  } catch (error) {
-    console.error('[Cache] Error loading OG holders:', error);
-    ogHoldersCache = [];
-    return ogHoldersCache;
-  }
-}
-
-async function loadNewHolders(): Promise<NFTHolder[]> {
-  if (newHoldersCache !== null) return newHoldersCache;
-  console.log('[Cache] Loading New holders from file');
-  try {
-    const holdersData = await fs.readFile(newHoldersFile, 'utf8');
-    newHoldersCache = JSON.parse(holdersData).holders as NFTHolder[];
-    if (!newHoldersCache) {
-      console.error('[Cache] Failed to load New holders, defaulting to empty array');
-      newHoldersCache = [];
-    }
-    console.log(`[Cache] Loaded ${newHoldersCache.length} New holders into memory`);
-    return newHoldersCache;
-  } catch (error) {
-    console.error('[Cache] Error loading New holders:', error);
-    newHoldersCache = [];
-    return newHoldersCache;
-  }
-}
+console.log('[Server] Initializing cache');
+loadCache().then(() => console.log('[Server] Cache initialized'));
 
 export const app = new Frog({
-  imageAspectRatio: '1:1',
-  title: 'Nuts State',
+    imageAspectRatio : '1:1',
+    title: 'Nuts State',
+  
   imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
 });
 
 app.use(neynar({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17', features: ['interactor', 'cast'] }));
-app.use('/*', serveStatic({ 
-  root: './public',
-  rewriteRequestPath: (path) => {
-    if (path === '/image' || path === '/og-image') {
-      return '/bg.png';
-    }
-    return path;
-  }
-}));
-
-app.use('*', async (c, next) => {
-  const start = Date.now();
-  console.log(`[Request] Start: ${c.req.path}`);
-  
-  try {
-    const timeout = setTimeout(() => {
-      console.error(`[Request] Timeout for ${c.req.path}`);
-      return c.text('Request timeout', 504);
-    }, 10000); // 10 ثانیه تایم‌اوت
-
-    await next();
-
-    clearTimeout(timeout);
-    console.log(`[Request] End: ${c.req.path}, Duration: ${Date.now() - start}ms`);
-  } catch (error) {
-    console.error(`[Request] Error for ${c.req.path}:`, error);
-    return c.text('Internal Server Error', 500);
-  }
-});
-
-app.use('*.png', async (c, next) => {
-  try {
-    c.header('Content-Type', 'image/png');
-    c.header('Cache-Control', 'public, max-age=3600');
-    c.header('Access-Control-Allow-Origin', '*');
-    await next();
-  } catch (error) {
-    console.error('[Image] Error serving image:', error);
-    return c.text('Image not found', 404);
-  }
-});
-
-app.use('/frame', async (c, next) => {
-  try {
-    c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-    c.header('Pragma', 'no-cache');
-    c.header('Expires', '0');
-    await next();
-  } catch (error) {
-    console.error('[Frame] Error handling frame request:', error);
-    return c.text('Frame generation error', 500);
-  }
-});
-
-app.use('*', async (c, next) => {
-  try {
-    await next();
-  } catch (error) {
-    console.error('[Error] Unhandled error:', error);
-    return c.text('Internal Server Error', 500);
-  }
-});
-
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3, timeout = 5000): Promise<Response> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-      const response = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
-      return response;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[API] Attempt ${attempt}/${retries} - Error: ${errorMessage}`);
-      if (attempt === retries) throw error;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-  throw new Error('Max retries reached');
-}
+app.use('/*', serveStatic({ root: './public' }));
 
 async function executeQuery(queryId: string): Promise<string | null> {
   console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount}) - 1 credit consumed`);
   try {
-    const response = await fetchWithRetry(
-      `https://api.dune.com/api/v1/query/${queryId}/execute`,
-      {
-        method: 'POST',
-        headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
-      }
-    );
+    const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/execute`, {
+      method: 'POST',
+      headers: { 'X-Dune-API-Key': 'croXzXynGL2zPt5h4w1esQXARtxge6Q5' }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
     const data = await response.json() as { execution_id: string };
     console.log(`[API] Query ${queryId} execution started with ID: ${data.execution_id}`);
     return data.execution_id;
@@ -277,13 +157,14 @@ async function executeQuery(queryId: string): Promise<string | null> {
 async function fetchQueryResult(executionId: string, queryId: string): Promise<ApiRow[] | null> {
   console.log(`[API] Fetching results for Query ${queryId} with execution ID ${executionId} (Request #${++apiRequestCount}) - 1 credit consumed`);
   try {
-    const response = await fetchWithRetry(
-      `https://api.dune.com/api/v1/execution/${executionId}/results`,
-      {
-        method: 'GET',
-        headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
-      }
-    );
+    const response = await fetch(`https://api.dune.com/api/v1/execution/${executionId}/results`, {
+      method: 'GET',
+      headers: { 'X-Dune-API-Key': 'croXzXynGL2zPt5h4w1esQXARtxge6Q5' }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
     const data = await response.json() as { state: string; result?: { rows: ApiRow[] } };
     if (data.state === 'EXECUTING' || data.state === 'PENDING') {
       console.log(`[API] Query ${queryId} still executing or pending. Results not ready yet.`);
@@ -337,7 +218,8 @@ function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const updateTimes = [0];
+  const updateTimes = [0, 360, 600, 1020, 1260];
+
 
   if (isCacheEmpty) {
     console.log(`[UpdateCheck] Cache is empty. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
@@ -399,19 +281,19 @@ async function updateQueries() {
       return;
     }
 
-    console.log('[Update] Waiting 30 seconds for query execution to complete');
-    await new Promise(resolve => setTimeout(resolve, 30000));
+    console.log('[Update] Waiting 3 minutes for query execution to complete');
+    await new Promise(resolve => setTimeout(resolve, 180000));
 
     const rows = await fetchQueryResult(executionId, queryId);
     if (rows === null) {
-      console.warn('[Update] Results not ready after 30 seconds. Aborting');
+      console.warn('[Update] Results not ready after 3 minutes. Aborting');
       return;
     }
     if (rows.length === 0) {
       console.warn('[Update] No rows fetched from API despite expecting data');
     }
 
-    const updatedRows = await Promise.all(rows.map(async (row: ApiRow) => {
+    const updatedRows = rows.map(async (row: ApiRow) => {
       const fid = String(row.fid || row.parent_fid || '');
       const sentPeanutCount = row.sent_peanut_count || 0;
 
@@ -427,9 +309,9 @@ async function updateQueries() {
       const cumulativeExcess = (existingRow ? existingRow.cumulativeExcess : 0) + excess;
 
       return { fid, data: row, cumulativeExcess };
-    }));
+    });
 
-    cache.queries[queryId] = { rows: updatedRows, lastUpdated: now };
+    cache.queries[queryId] = { rows: await Promise.all(updatedRows), lastUpdated: now };
     if (!cache.initialFetchDone && isCacheEmpty) {
       cache.initialFetchDone = true;
       console.log('[Update] Initial fetch completed and locked');
@@ -444,47 +326,46 @@ async function updateQueries() {
 }
 
 function scheduleUpdates() {
-  setInterval(() => {
+  setInterval(async () => {
     console.log('[Scheduler] Checking for scheduled update');
-    setTimeout(() => updateQueries(), 0); // غیرهمزمان کردن
+    await updateQueries();
   }, 5 * 60 * 1000);
 }
 
 console.log('[Server] Starting update scheduler');
 scheduleUpdates();
 
-async function getWalletAddressFromFid(fid: string): Promise<{ wallet1: string | null; wallet2: string | null }> {
-  console.log(`[Neynar] Fetching verified wallet addresses for FID ${fid}`);
+async function getWalletAddressFromFid(fid: string): Promise<string | null> {
+  console.log(`[Neynar] Fetching wallet address for FID ${fid}`);
   if (fid === 'N/A') {
     console.log('[Neynar] FID is N/A, skipping request');
-    return { wallet1: null, wallet2: null };
+    return null;
   }
   try {
     const response = await client.fetchBulkUsers({ fids: [Number(fid)] });
     const user = response.users[0];
-    const ethAddresses = user?.verified_addresses?.eth_addresses || [];
-    const wallet1 = ethAddresses[0] || null;
-    const wallet2 = ethAddresses[1] || null;
-    console.log(`[Neynar] Verified wallets for FID ${fid}: Wallet1: ${wallet1}, Wallet2: ${wallet2}`);
-    return { wallet1, wallet2 };
+    const walletAddress = user?.verified_addresses?.eth_addresses?.[0] || user?.custody_address;
+    console.log(`[Neynar] Wallet address for FID ${fid}: ${walletAddress}`);
+    return walletAddress || null;
   } catch (error) {
-    console.error(`[Neynar] Error fetching verified wallet addresses: ${error}`);
-    return { wallet1: null, wallet2: null };
+    console.error(`[Neynar] Error fetching wallet address: ${error}`);
+    return null;
   }
 }
 
 async function isOGNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds OG NFT from ${OG_NFT_CONTRACT_ADDRESS} using offline data`);
   try {
-    const { wallet1 } = await getWalletAddressFromFid(fid);
-    if (!wallet1) {
+    const walletAddress = await getWalletAddressFromFid(fid);
+    if (!walletAddress) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
     }
-    const holders = await loadOGHolders();
-    const holder = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
+    const holdersData = await fs.readFile(ogHoldersFile, 'utf8');
+    const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
+    const holder = holders.find(h => h.wallet.toLowerCase() === walletAddress.toLowerCase());
     const count = holder ? holder.count : 0;
-    console.log(`[NFT] FID ${fid} (Wallet: ${wallet1}) holds ${count} OG NFTs`);
+    console.log(`[NFT] FID ${fid} (Wallet: ${walletAddress}) holds ${count} OG NFTs`);
     return count;
   } catch (error) {
     console.error(`[NFT] Error checking OG holder status offline: ${error}`);
@@ -495,22 +376,16 @@ async function isOGNFTHolder(fid: string): Promise<number> {
 async function isNewNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds New NFT from ${NEW_NFT_CONTRACT_ADDRESS} using offline data`);
   try {
-    const { wallet1, wallet2 } = await getWalletAddressFromFid(fid);
-    if (!wallet1 && !wallet2) {
+    const walletAddress = await getWalletAddressFromFid(fid);
+    if (!walletAddress) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
     }
-    const holders = await loadNewHolders();
-    let count = 0;
-    if (wallet1) {
-      const holder1 = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
-      count += holder1 ? holder1.count : 0;
-    }
-    if (wallet2) {
-      const holder2 = holders.find(h => h.wallet.toLowerCase() === wallet2.toLowerCase());
-      count += holder2 ? holder2.count : 0;
-    }
-    console.log(`[NFT] FID ${fid} (Wallets: ${wallet1}, ${wallet2}) holds ${count} New NFTs`);
+    const holdersData = await fs.readFile(newHoldersFile, 'utf8');
+    const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
+    const holder = holders.find(h => h.wallet.toLowerCase() === walletAddress.toLowerCase());
+    const count = holder ? holder.count : 0;
+    console.log(`[NFT] FID ${fid} (Wallet: ${walletAddress}) holds ${count} New NFTs`);
     return count;
   } catch (error) {
     console.error(`[NFT] Error checking New NFT holder status offline: ${error}`);
@@ -525,10 +400,7 @@ async function getUserDataFromCache(fid: string): Promise<{
   remainingAllowance: string;
   userRank: number;
   reduceEndSeason: string;
-  verifiedWallet1: string;
-  verifiedWallet2: string;
-  warpcastVerifiedLink1: string;
-  warpcastVerifiedLink2: string;
+  usingWallet: string;
 }> {
   console.log(`[Data] Fetching data strictly from cache.json for FID ${fid}`);
   const userRow = cache.queries['4837362'].rows.find((row) => row.fid === fid) || { data: {}, cumulativeExcess: 0 };
@@ -541,7 +413,8 @@ async function getUserDataFromCache(fid: string): Promise<{
   const ogNFTCount = await isOGNFTHolder(fid);
   const newNFTCount = await isNewNFTHolder(fid);
 
-  OGpic = ogNFTCount;
+  // تنظیم متغیرهای OGpic و Usertype برای استفاده در رندر بج‌ها
+  OGpic = ogNFTCount; // تعداد OG NFTها
   if (newNFTCount === 1) {
     Usertype = "Member";
   } else if (newNFTCount === 2) {
@@ -556,6 +429,7 @@ async function getUserDataFromCache(fid: string): Promise<{
   let remainingAllowance: string;
   let reduceEndSeason = '';
 
+  // محاسبه الوانس کل با جمع OG و NEW
   const ogAllowance = ogNFTCount * 150;
   const newAllowance = newNFTCount === 1 ? 30 : newNFTCount === 2 ? 45 : newNFTCount >= 3 ? 60 : 0;
   const nonHolderAllowance = (ogNFTCount === 0 && newNFTCount === 0 && ALLOW_NON_HOLDERS) ? 30 : 0;
@@ -583,15 +457,11 @@ async function getUserDataFromCache(fid: string): Promise<{
   }
 
   const userRank = userData.rank || 0;
+  const walletAddress = await getWalletAddressFromFid(fid);
+  const usingWallet = walletAddress ? `${walletAddress.slice(0, 3)}...${walletAddress.slice(-3)}` : 'N/A';
 
-  const { wallet1, wallet2 } = await getWalletAddressFromFid(fid);
-  const verifiedWallet1 = wallet1 ? `${wallet1.slice(0, 3)}...${wallet1.slice(-3)}` : 'N/A';
-  const verifiedWallet2 = wallet2 ? `${wallet2.slice(0, 3)}...${wallet2.slice(-3)}` : 'N/A';
-  const warpcastVerifiedLink1 = wallet1 ? `https://warpcast.com/~/profile/${fid}` : 'N/A';
-  const warpcastVerifiedLink2 = wallet2 ? `https://warpcast.com/~/profile/${fid}` : 'N/A';
-
-  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}, VerifiedWallet1: ${verifiedWallet1}, VerifiedWallet2: ${verifiedWallet2}`);
-  return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, verifiedWallet1, verifiedWallet2, warpcastVerifiedLink1, warpcastVerifiedLink2 };
+  console.log(`[Data] FID ${fid} - Today: ${todayPeanutCount}, Total: ${totalPeanutCount}, Sent: ${sentPeanutCount}, Allowance: ${remainingAllowance}, Rank: ${userRank}, ReduceEndSeason: ${reduceEndSeason}, UsingWallet: ${usingWallet}`);
+  return { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, usingWallet };
 }
 
 app.frame('/', async (c) => {
@@ -628,7 +498,7 @@ app.frame('/', async (c) => {
   const username = urlParams.get("username") || interactor.username || "Unknown";
   const pfpUrl = urlParams.get("pfpUrl") || interactor.pfpUrl || "";
 
-  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, verifiedWallet1, verifiedWallet2, warpcastVerifiedLink1, warpcastVerifiedLink2 } = await getUserDataFromCache(fid);
+  const { todayPeanutCount, totalPeanutCount, sentPeanutCount, remainingAllowance, userRank, reduceEndSeason, usingWallet } = await getUserDataFromCache(fid);
   const hashId = await getOrGenerateHashId(fid);
   const frameUrl = `https://nuts-state.up.railway.app/?hashid=${hashId}&fid=${fid}&username=${encodeURIComponent(username)}&pfpUrl=${encodeURIComponent(pfpUrl)}`;
   const composeCastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent('Check out your 🥜 stats! \n\n Frame by @arsalang.eth & @jeyloo.eth ')}&embeds[]=${encodeURIComponent(frameUrl)}`;
@@ -652,8 +522,9 @@ app.frame('/', async (c) => {
             overflow: "hidden",
           }}
         >
+          {/* BG */}
           <img
-            src="/bg.png"
+            src="https://img12.pixhost.to/images/1135/579348089_bg.png"
             style={{
               width: "100%",
               height: "100%",
@@ -664,9 +535,10 @@ app.frame('/', async (c) => {
             }}
           />
     
+          {/* Pfp Url */}
           {pfpUrl && (
             <img
-              src={anticURLSanitize(pfpUrl)}
+              src={pfpUrl}
               alt="Profile Picture"
               style={{
                 width: "160px",
@@ -680,6 +552,7 @@ app.frame('/', async (c) => {
             />
           )}
     
+          {/* Username */}
           <p
             style={{
               position: "absolute",
@@ -694,6 +567,7 @@ app.frame('/', async (c) => {
             {username}
           </p>
     
+          {/* FID */}
           <p
             style={{
               position: "absolute",
@@ -745,24 +619,13 @@ app.frame('/', async (c) => {
           <p
             style={{
               position: "absolute",
-              top: "80%",
-              left: "62%",
+              top: "81%",
+              left: "59%",
               color: "#ffffff",
-              fontSize: "23px",
+              fontSize: "33px",
             }}
           >
-            {verifiedWallet1}
-          </p>
-          <p
-            style={{
-              position: "absolute",
-              top: "85%",
-              left: "62%",
-              color: "#ffffff",
-              fontSize: "23px",
-            }}
-          >
-             {verifiedWallet2}
+            {usingWallet}
           </p>
           <p
             style={{
@@ -776,9 +639,11 @@ app.frame('/', async (c) => {
             {userRank}
           </p>
 
+          {/* نمایش بج‌ها بر اساس شرایط جدید */}
+          {/* بج OG: اگر هولدر حداقل 1 NFT نوع OG داشته باشه */}
           {OGpic > 0 && (
             <img
-              src="/og.png"
+              src="https://img12.pixhost.to/images/1090/578542519_og-6-copy.png"
               width="131"
               height="187"
               style={{
@@ -788,9 +653,11 @@ app.frame('/', async (c) => {
               }}
             />
           )}
+
+          {/* بج Member: اگر هولدر حداقل 1 NFT نوع New داشته باشه */}
           {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="/member.png"
+              src="https://img12.pixhost.to/images/1092/578585661_2.png"
               width="100"
               height="100"
               style={{
@@ -800,9 +667,11 @@ app.frame('/', async (c) => {
               }}
             />
           )}
+
+          {/* بج Regular: اگر هولدر حداقل 2 NFT نوع New داشته باشه */}
           {(Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="/regular.png"
+              src="https://img12.pixhost.to/images/1093/578590423_1.png"
               width="100"
               height="100"
               style={{
@@ -812,9 +681,11 @@ app.frame('/', async (c) => {
               }}
             />
           )}
+
+          {/* بج Active: اگر هولدر 3 یا بیشتر NFT نوع New داشته باشه */}
           {Usertype === "Active" && (
             <img
-              src="/active.png"
+              src="https://img12.pixhost.to/images/1092/578587015_3.png"
               width="100"
               height="100"
               style={{
@@ -824,9 +695,11 @@ app.frame('/', async (c) => {
               }}
             />
           )}
+
+          {/* نمایش تیک در صورت عدم وجود Reduce End Season */}
           {reduceEndSeason === "" && (
             <img
-              src="/tik.png"
+              src="https://img12.pixhost.to/images/870/575350880_tik.png"
               width="55"
               height="55"
               style={{
@@ -836,6 +709,8 @@ app.frame('/', async (c) => {
               }}
             />
           )}
+
+          {/* Reduce */}
           <p
             style={{
               position: "absolute",
@@ -849,6 +724,7 @@ app.frame('/', async (c) => {
           </p>
         </div>
       ),
+        
       intents: [
         <Button value="my_state">My State</Button>,
         <Button.Link href={composeCastUrl}>Share</Button.Link>,
@@ -870,29 +746,6 @@ app.frame('/', async (c) => {
   }
 });
 
-function anticURLSanitize(url: string): string {
-  const decodedURL = decodeURIComponent(url);
-  const cleanURL = decodedURL.replace(/[<>"'`;]/g, "");
-  const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i;
-  if (!urlPattern.test(cleanURL)) {
-    return "";
-  }
-  return cleanURL;
-}
-
-const port = Number(process.env.PORT) || 3000;
+const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
-
-process.on('uncaughtException', (error: Error) => {
-  console.error('[Server] Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
-  console.error('[Server] Unhandled Rejection:', reason);
-});
-
-serve({
-  fetch: app.fetch,
-  port: port,
-  hostname: '0.0.0.0'
-});
+serve(app);
