@@ -40,7 +40,7 @@ let cache: {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 5;
+const MAX_RPS = 7;
 const MAX_RPM = 300;
 const LOAD_THRESHOLD = 4;
 const SECOND_DURATION = 1000;
@@ -130,72 +130,7 @@ export const app = new Frog({
 });
 
 app.use(neynar({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17', features: ['interactor', 'cast'] }));
-app.use('/*', serveStatic({ 
-  root: './public',
-  rewriteRequestPath: (path) => {
-    if (path === '/image' || path === '/og-image') {
-      return '/bg.png';
-    }
-    return path;
-  }
-}));
-
-app.use('*', async (c, next) => {
-  const start = Date.now();
-  console.log(`[Request] Start: ${c.req.path}`);
-  
-  try {
-    // Set timeout for the request
-    const timeout = setTimeout(() => {
-      console.error(`[Request] Timeout for ${c.req.path}`);
-      return c.text('Request timeout', 504);
-    }, 25000); // 25 second timeout
-
-    await next();
-
-    clearTimeout(timeout);
-    console.log(`[Request] End: ${c.req.path}, Duration: ${Date.now() - start}ms`);
-  } catch (error) {
-    console.error(`[Request] Error for ${c.req.path}:`, error);
-    return c.text('Internal Server Error', 500);
-  }
-});
-
-// Add specific handling for image requests
-app.use('*.png', async (c, next) => {
-  try {
-    c.header('Content-Type', 'image/png');
-    c.header('Cache-Control', 'public, max-age=3600');
-    c.header('Access-Control-Allow-Origin', '*');
-    await next();
-  } catch (error) {
-    console.error('[Image] Error serving image:', error);
-    return c.text('Image not found', 404);
-  }
-});
-
-// Add specific handling for frame requests
-app.use('/frame', async (c, next) => {
-  try {
-    c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-    c.header('Pragma', 'no-cache');
-    c.header('Expires', '0');
-    await next();
-  } catch (error) {
-    console.error('[Frame] Error handling frame request:', error);
-    return c.text('Frame generation error', 500);
-  }
-});
-
-// Add error handling middleware
-app.use('*', async (c, next) => {
-  try {
-    await next();
-  } catch (error) {
-    console.error('[Error] Unhandled error:', error);
-    return c.text('Internal Server Error', 500);
-  }
-});
+app.use('/*', serveStatic({ root: './public' }));
 
 async function executeQuery(queryId: string): Promise<string | null> {
   console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount}) - 1 credit consumed`);
@@ -609,7 +544,7 @@ app.frame('/', async (c) => {
           }}
         >
           <img
-            src="/bg.png"
+            src="https://i.imgur.com/CD7K8ps.png"
             style={{
               width: "100%",
               height: "100%",
@@ -734,7 +669,7 @@ app.frame('/', async (c) => {
 
           {OGpic > 0 && (
             <img
-              src="/og.png"
+              src="https://img12.pixhost.to/images/1090/578542519_og-6-copy.png"
               width="131"
               height="187"
               style={{
@@ -746,7 +681,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="/member.png"
+              src="https://img12.pixhost.to/images/1092/578585661_2.png"
               width="100"
               height="100"
               style={{
@@ -758,7 +693,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="/regular.png"
+              src="https://img12.pixhost.to/images/1093/578590423_1.png"
               width="100"
               height="100"
               style={{
@@ -770,7 +705,7 @@ app.frame('/', async (c) => {
           )}
           {Usertype === "Active" && (
             <img
-              src="/active.png"
+              src="https://img12.pixhost.to/images/1092/578587015_3.png"
               width="100"
               height="100"
               style={{
@@ -782,7 +717,7 @@ app.frame('/', async (c) => {
           )}
           {reduceEndSeason === "" && (
             <img
-              src="/tik.png"
+              src="https://img12.pixhost.to/images/870/575350880_tik.png"
               width="55"
               height="55"
               style={{
@@ -836,21 +771,7 @@ function anticURLSanitize(url: string): string {
   return cleanURL;
 }
 
-const port = Number(process.env.PORT) || 3000;
+const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
 
-// Add process error handlers
-process.on('uncaughtException', (error: Error) => {
-  console.error('[Server] Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
-  console.error('[Server] Unhandled Rejection:', reason);
-});
-
-// Start server with basic configuration
-serve({
-  fetch: app.fetch,
-  port: port,
-  hostname: '0.0.0.0'
-});
+serve(app);
