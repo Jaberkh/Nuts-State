@@ -61,10 +61,6 @@ const ALLOW_NON_HOLDERS = true;
 const config = new Configuration({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17' });
 const client = new NeynarAPIClient(config);
 
-// کش برای هولدرهای NFT
-let ogHoldersCache: NFTHolder[] | null = null;
-let newHoldersCache: NFTHolder[] | null = null;
-
 // راه‌اندازی Moralis
 console.log('[Moralis] Initializing Moralis SDK');
 Moralis.start({ apiKey: MORALIS_API_KEY }).then(() => {
@@ -73,7 +69,7 @@ Moralis.start({ apiKey: MORALIS_API_KEY }).then(() => {
   console.error('[Moralis] Error initializing Moralis SDK:', error);
 });
 
-// توابع کمکی
+// توابع
 function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   const now = Date.now();
   while (secondTimestamps.length > 0 && now - secondTimestamps[0] > SECOND_DURATION) {
@@ -124,43 +120,8 @@ async function saveCache() {
   console.log(`[Cache] Cache saved to cache.json with ${cache.queries['4837362'].rows.length} rows`);
 }
 
-async function loadOGHolders(): Promise<NFTHolder[]> {
-  if (ogHoldersCache !== null) return ogHoldersCache;
-  console.log('[Cache] Loading OG holders from file');
-  try {
-    const holdersData = await fs.readFile(ogHoldersFile, 'utf8');
-    ogHoldersCache = JSON.parse(holdersData).holders as NFTHolder[];
-    if (!ogHoldersCache) {
-      console.error('[Cache] Failed to load OG holders, defaulting to empty array');
-      ogHoldersCache = [];
-    }
-    console.log(`[Cache] Loaded ${ogHoldersCache.length} OG holders into memory`);
-    return ogHoldersCache;
-  } catch (error) {
-    console.error('[Cache] Error loading OG holders:', error);
-    ogHoldersCache = [];
-    return ogHoldersCache;
-  }
-}
-
-async function loadNewHolders(): Promise<NFTHolder[]> {
-  if (newHoldersCache !== null) return newHoldersCache;
-  console.log('[Cache] Loading New holders from file');
-  try {
-    const holdersData = await fs.readFile(newHoldersFile, 'utf8');
-    newHoldersCache = JSON.parse(holdersData).holders as NFTHolder[];
-    if (!newHoldersCache) {
-      console.error('[Cache] Failed to load New holders, defaulting to empty array');
-      newHoldersCache = [];
-    }
-    console.log(`[Cache] Loaded ${newHoldersCache.length} New holders into memory`);
-    return newHoldersCache;
-  } catch (error) {
-    console.error('[Cache] Error loading New holders:', error);
-    newHoldersCache = [];
-    return newHoldersCache;
-  }
-}
+console.log('[Server] Initializing cache');
+loadCache().then(() => console.log('[Server] Cache initialized'));
 
 export const app = new Frog({
   imageAspectRatio: '1:1',
@@ -184,10 +145,11 @@ app.use('*', async (c, next) => {
   console.log(`[Request] Start: ${c.req.path}`);
   
   try {
+    // Set timeout for the request
     const timeout = setTimeout(() => {
       console.error(`[Request] Timeout for ${c.req.path}`);
       return c.text('Request timeout', 504);
-    }, 10000); // 10 ثانیه تایم‌اوت
+    }, 25000); // 25 second timeout
 
     await next();
 
@@ -199,6 +161,7 @@ app.use('*', async (c, next) => {
   }
 });
 
+// Add specific handling for image requests
 app.use('*.png', async (c, next) => {
   try {
     c.header('Content-Type', 'image/png');
@@ -211,6 +174,7 @@ app.use('*.png', async (c, next) => {
   }
 });
 
+// Add specific handling for frame requests
 app.use('/frame', async (c, next) => {
   try {
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -223,6 +187,7 @@ app.use('/frame', async (c, next) => {
   }
 });
 
+// Add error handling middleware
 app.use('*', async (c, next) => {
   try {
     await next();
@@ -232,38 +197,17 @@ app.use('*', async (c, next) => {
   }
 });
 
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3, timeout = 5000): Promise<Response> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-      const response = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
-      return response;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[API] Attempt ${attempt}/${retries} - Error: ${errorMessage}`);
-      if (attempt === retries) throw error;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-  throw new Error('Max retries reached');
-}
-
 async function executeQuery(queryId: string): Promise<string | null> {
   console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount}) - 1 credit consumed`);
   try {
-    const response = await fetchWithRetry(
-      `https://api.dune.com/api/v1/query/${queryId}/execute`,
-      {
-        method: 'POST',
-        headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
-      }
-    );
+    const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/execute`, {
+      method: 'POST',
+      headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
     const data = await response.json() as { execution_id: string };
     console.log(`[API] Query ${queryId} execution started with ID: ${data.execution_id}`);
     return data.execution_id;
@@ -277,13 +221,14 @@ async function executeQuery(queryId: string): Promise<string | null> {
 async function fetchQueryResult(executionId: string, queryId: string): Promise<ApiRow[] | null> {
   console.log(`[API] Fetching results for Query ${queryId} with execution ID ${executionId} (Request #${++apiRequestCount}) - 1 credit consumed`);
   try {
-    const response = await fetchWithRetry(
-      `https://api.dune.com/api/v1/execution/${executionId}/results`,
-      {
-        method: 'GET',
-        headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
-      }
-    );
+    const response = await fetch(`https://api.dune.com/api/v1/execution/${executionId}/results`, {
+      method: 'GET',
+      headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
     const data = await response.json() as { state: string; result?: { rows: ApiRow[] } };
     if (data.state === 'EXECUTING' || data.state === 'PENDING') {
       console.log(`[API] Query ${queryId} still executing or pending. Results not ready yet.`);
@@ -399,19 +344,19 @@ async function updateQueries() {
       return;
     }
 
-    console.log('[Update] Waiting 30 seconds for query execution to complete');
-    await new Promise(resolve => setTimeout(resolve, 30000));
+    console.log('[Update] Waiting 3 minutes for query execution to complete');
+    await new Promise(resolve => setTimeout(resolve, 180000));
 
     const rows = await fetchQueryResult(executionId, queryId);
     if (rows === null) {
-      console.warn('[Update] Results not ready after 30 seconds. Aborting');
+      console.warn('[Update] Results not ready after 3 minutes. Aborting');
       return;
     }
     if (rows.length === 0) {
       console.warn('[Update] No rows fetched from API despite expecting data');
     }
 
-    const updatedRows = await Promise.all(rows.map(async (row: ApiRow) => {
+    const updatedRows = rows.map(async (row: ApiRow) => {
       const fid = String(row.fid || row.parent_fid || '');
       const sentPeanutCount = row.sent_peanut_count || 0;
 
@@ -427,9 +372,9 @@ async function updateQueries() {
       const cumulativeExcess = (existingRow ? existingRow.cumulativeExcess : 0) + excess;
 
       return { fid, data: row, cumulativeExcess };
-    }));
+    });
 
-    cache.queries[queryId] = { rows: updatedRows, lastUpdated: now };
+    cache.queries[queryId] = { rows: await Promise.all(updatedRows), lastUpdated: now };
     if (!cache.initialFetchDone && isCacheEmpty) {
       cache.initialFetchDone = true;
       console.log('[Update] Initial fetch completed and locked');
@@ -444,9 +389,9 @@ async function updateQueries() {
 }
 
 function scheduleUpdates() {
-  setInterval(() => {
+  setInterval(async () => {
     console.log('[Scheduler] Checking for scheduled update');
-    setTimeout(() => updateQueries(), 0); // غیرهمزمان کردن
+    await updateQueries();
   }, 5 * 60 * 1000);
 }
 
@@ -463,8 +408,8 @@ async function getWalletAddressFromFid(fid: string): Promise<{ wallet1: string |
     const response = await client.fetchBulkUsers({ fids: [Number(fid)] });
     const user = response.users[0];
     const ethAddresses = user?.verified_addresses?.eth_addresses || [];
-    const wallet1 = ethAddresses[0] || null;
-    const wallet2 = ethAddresses[1] || null;
+    const wallet1 = ethAddresses[0] || null; // آدرس وریفاید اول
+    const wallet2 = ethAddresses[1] || null; // آدرس وریفاید دوم (اگه باشه)
     console.log(`[Neynar] Verified wallets for FID ${fid}: Wallet1: ${wallet1}, Wallet2: ${wallet2}`);
     return { wallet1, wallet2 };
   } catch (error) {
@@ -481,7 +426,8 @@ async function isOGNFTHolder(fid: string): Promise<number> {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
     }
-    const holders = await loadOGHolders();
+    const holdersData = await fs.readFile(ogHoldersFile, 'utf8');
+    const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
     const holder = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
     const count = holder ? holder.count : 0;
     console.log(`[NFT] FID ${fid} (Wallet: ${wallet1}) holds ${count} OG NFTs`);
@@ -494,29 +440,39 @@ async function isOGNFTHolder(fid: string): Promise<number> {
 
 async function isNewNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds New NFT from ${NEW_NFT_CONTRACT_ADDRESS} using offline data`);
+  
   try {
     const { wallet1, wallet2 } = await getWalletAddressFromFid(fid);
+
     if (!wallet1 && !wallet2) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
     }
-    const holders = await loadNewHolders();
+
+    const holdersData = await fs.readFile(newHoldersFile, 'utf8');
+    const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
+
     let count = 0;
+
     if (wallet1) {
       const holder1 = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
       count += holder1 ? holder1.count : 0;
     }
+
     if (wallet2) {
       const holder2 = holders.find(h => h.wallet.toLowerCase() === wallet2.toLowerCase());
       count += holder2 ? holder2.count : 0;
     }
+
     console.log(`[NFT] FID ${fid} (Wallets: ${wallet1}, ${wallet2}) holds ${count} New NFTs`);
     return count;
+
   } catch (error) {
     console.error(`[NFT] Error checking New NFT holder status offline: ${error}`);
     return 0;
   }
 }
+
 
 async function getUserDataFromCache(fid: string): Promise<{
   todayPeanutCount: number;
@@ -571,7 +527,7 @@ async function getUserDataFromCache(fid: string): Promise<{
     } else {
       maxAllowance = 0;
       remainingAllowance = 'mint your allowance';
-      reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
+      reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : ''; // اینجا carbs رو با '' عوض کردم
     }
   }
 
@@ -883,6 +839,7 @@ function anticURLSanitize(url: string): string {
 const port = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
 
+// Add process error handlers
 process.on('uncaughtException', (error: Error) => {
   console.error('[Server] Uncaught Exception:', error);
 });
@@ -891,6 +848,7 @@ process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) =>
   console.error('[Server] Unhandled Rejection:', reason);
 });
 
+// Start server with basic configuration
 serve({
   fetch: app.fetch,
   port: port,
