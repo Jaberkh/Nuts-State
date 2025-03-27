@@ -544,7 +544,7 @@ app.frame('/', async (c) => {
           }}
         >
           <img
-            src="https://i.imgur.com/CD7K8ps.png"
+            src="/bg.png"
             style={{
               width: "100%",
               height: "100%",
