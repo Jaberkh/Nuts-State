@@ -1,6 +1,10 @@
 {
   "holders": [
     {
+      "wallet": "0x3E00E8a658924C4b5fD37784393e0932bB269189",
+      "count": 1
+    },
+    {
       "wallet": "0x05290e2b3c2cd9ab031eabb03d92735b323a10e6",
       "count": 4
     },
