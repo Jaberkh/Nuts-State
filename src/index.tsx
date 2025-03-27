@@ -134,20 +134,36 @@ export const app = new Frog({
 });
 
 app.use(neynar({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17', features: ['interactor', 'cast'] }));
-app.use('/*', serveStatic({ root: './public' }));
+app.use('/*', serveStatic({ 
+  root: './public',
+  rewriteRequestPath: (path) => {
+    if (path === '/image' || path === '/og-image') {
+      return '/bg.png';
+    }
+    return path;
+  }
+}));
 
 app.use('*.png', async (c, next) => {
-  c.header('Content-Type', 'image/png');
-  c.header('Cache-Control', 'public, max-age=3600'); // کش برای یک ساعت
-  c.header('Access-Control-Allow-Origin', '*');
-  await next();
+  try {
+    c.header('Content-Type', 'image/png');
+    c.header('Cache-Control', 'public, max-age=3600');
+    c.header('Access-Control-Allow-Origin', '*');
+    await next();
+  } catch (err) {
+    console.error('[Image Error]', err);
+    return c.text('Image not found', 404);
+  }
 });
 
 app.use('*', async (c, next) => {
   const start = Date.now();
   console.log(`[Request] Start: ${c.req.path}`);
-  await next();
-  console.log(`[Request] End: ${c.req.path}, Duration: ${Date.now() - start}ms`);
+  try {
+    await next();
+  } finally {
+    console.log(`[Request] End: ${c.req.path}, Duration: ${Date.now() - start}ms`);
+  }
 });
 
 async function executeQuery(queryId: string): Promise<string | null> {
@@ -791,7 +807,9 @@ function anticURLSanitize(url: string): string {
 
 const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
+
 serve({
   fetch: app.fetch,
-  port: port
+  port: port,
+  hostname: '0.0.0.0'  // Listen on all available network interfaces
 });
