@@ -774,4 +774,31 @@ function anticURLSanitize(url: string): string {
 const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
 
-serve(app);
+// Add error handling for uncaught exceptions
+process.on('uncaughtException', (error: Error) => {
+  console.error('[Server] Uncaught Exception:', error);
+  // Don't exit the process, just log the error
+});
+
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+  console.error('[Server] Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit the process, just log the error
+});
+
+// Add memory monitoring
+setInterval(() => {
+  const used = process.memoryUsage();
+  console.log(`[Memory] Usage: ${Math.round(used.heapUsed / 1024 / 1024)}MB / ${Math.round(used.heapTotal / 1024 / 1024)}MB`);
+}, 60000); // Log memory usage every minute
+
+// Add server health check endpoint
+app.get('/health', (c) => {
+  return c.text('OK');
+});
+
+// Start server with basic configuration
+serve({
+  fetch: app.fetch,
+  port: port,
+  hostname: '0.0.0.0'
+});
