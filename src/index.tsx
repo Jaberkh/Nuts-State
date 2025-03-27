@@ -124,13 +124,31 @@ console.log('[Server] Initializing cache');
 loadCache().then(() => console.log('[Server] Cache initialized'));
 
 export const app = new Frog({
+  imageOptions: { 
+    width: 800,
+    height: 800,
+    debug: true
+  },
   imageAspectRatio: '1:1',
-  title: 'Nuts State',
-  imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
+  title: 'Nuts State'
 });
 
 app.use(neynar({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17', features: ['interactor', 'cast'] }));
 app.use('/*', serveStatic({ root: './public' }));
+
+app.use('*.png', async (c, next) => {
+  c.header('Content-Type', 'image/png');
+  c.header('Cache-Control', 'public, max-age=3600'); // کش برای یک ساعت
+  c.header('Access-Control-Allow-Origin', '*');
+  await next();
+});
+
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  console.log(`[Request] Start: ${c.req.path}`);
+  await next();
+  console.log(`[Request] End: ${c.req.path}, Duration: ${Date.now() - start}ms`);
+});
 
 async function executeQuery(queryId: string): Promise<string | null> {
   console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount}) - 1 credit consumed`);
@@ -773,5 +791,7 @@ function anticURLSanitize(url: string): string {
 
 const port: number = Number(process.env.PORT) || 3000;
 console.log(`[Server] Starting server on port ${port}`);
-
-serve(app);
+serve({
+  fetch: app.fetch,
+  port: port
+});
