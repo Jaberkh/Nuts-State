@@ -669,7 +669,7 @@ app.frame('/', async (c) => {
 
           {OGpic > 0 && (
             <img
-              src="https://img12.pixhost.to/images/1090/578542519_og-6-copy.png"
+              src="/og.png"
               width="131"
               height="187"
               style={{
@@ -681,7 +681,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="https://img12.pixhost.to/images/1092/578585661_2.png"
+              src="member.png"
               width="100"
               height="100"
               style={{
@@ -693,7 +693,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="https://img12.pixhost.to/images/1093/578590423_1.png"
+              src="regular.png"
               width="100"
               height="100"
               style={{
@@ -705,7 +705,7 @@ app.frame('/', async (c) => {
           )}
           {Usertype === "Active" && (
             <img
-              src="https://img12.pixhost.to/images/1092/578587015_3.png"
+              src="active.png"
               width="100"
               height="100"
               style={{

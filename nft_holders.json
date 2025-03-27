@@ -105,7 +105,15 @@
       "count": 1
     },
     {
+      "wallet": "0xcd2711c170bfbfb0bf632868446f9dd49683ee7b",
+      "count": 1
+    },
+    {
       "wallet": "0x0ad5ab29b8aa8a8c7bece5f03cc5efe8a2ab292b",
+      "count": 1
+    },
+    {
+      "wallet": "0x489055a831959fb317b42f4f20a112c24093d870",
       "count": 1
     },
     {
@@ -129,5 +137,5 @@
       "count": 1
     }
   ],
-  "last_updated": 1743033791450
+  "last_updated": 1743069197385
 }
