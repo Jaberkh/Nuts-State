@@ -126,11 +126,48 @@ loadCache().then(() => console.log('[Server] Cache initialized'));
 export const app = new Frog({
   imageAspectRatio: '1:1',
   title: 'Nuts State',
-  imageOptions: { fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }] },
+  imageOptions: { 
+    fonts: [{ name: 'Poetsen One', weight: 400, source: 'google' }],
+    width: 1200,
+    height: 1200,
+    debug: true
+  },
 });
 
 app.use(neynar({ apiKey: '0AFD6D12-474C-4AF0-B580-312341F61E17', features: ['interactor', 'cast'] }));
-app.use('/*', serveStatic({ root: './public' }));
+
+// Add logging middleware
+app.use('*', async (c, next) => {
+  console.log(`[Request] ${c.req.method} ${c.req.path}`);
+  await next();
+});
+
+// Configure static file serving with proper headers
+app.use('/*', async (c, next) => {
+  const path = c.req.path;
+  
+  // Handle /image and /og-image paths
+  if (path === '/image' || path === '/og-image') {
+    return c.redirect('/bg.png');
+  }
+
+  // Serve static files with proper headers
+  return serveStatic({
+    root: './public',
+    rewriteRequestPath: (path: string) => {
+      console.log(`[Static] Serving file: ${path}`);
+      return path;
+    }
+  })(c, next);
+});
+
+// Add middleware to set headers for images
+app.use('*.png', async (c, next) => {
+  c.header('Content-Type', 'image/png');
+  c.header('Cache-Control', 'public, max-age=31536000');
+  c.header('Access-Control-Allow-Origin', '*');
+  await next();
+});
 
 async function executeQuery(queryId: string): Promise<string | null> {
   console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount}) - 1 credit consumed`);
@@ -720,7 +757,7 @@ app.frame('/', async (c) => {
           )}
           {reduceEndSeason === "" && (
             <img
-              src={`${imageBaseUrl}/tik.png`}
+              src="https://img12.pixhost.to/images/870/575350880_tik.png"
               width="55"
               height="55"
               style={{
