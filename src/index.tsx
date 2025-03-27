@@ -40,7 +40,7 @@ let cache: {
 
 const secondTimestamps: number[] = [];
 const minuteTimestamps: number[] = [];
-const MAX_RPS = 5;
+const MAX_RPS = 7;
 const MAX_RPM = 300;
 const LOAD_THRESHOLD = 4;
 const SECOND_DURATION = 1000;
