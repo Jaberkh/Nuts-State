@@ -1,5 +1,9 @@
 {
   "holders": [
+    {
+      "wallet": "0x3E00E8a658924C4b5fD37784393e0932bB269189",
+      "count": 1
+    },
      {
       "wallet": "0x2c0758f1c3bbf5a2f21855901308a0c2776671c7",
       "count": 2
@@ -90,10 +94,6 @@
     },
     {
       "wallet": "0x75afacac743769c517726064722737d75bb501e4",
-      "count": 1
-    },
-    {
-      "wallet": "0x4dca2d825ef79df8e3191f4efd2326e220404a76",
       "count": 1
     },
     {
