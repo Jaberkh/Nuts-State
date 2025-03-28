@@ -69,6 +69,28 @@ Moralis.start({ apiKey: MORALIS_API_KEY }).then(() => {
   console.error('[Moralis] Error initializing Moralis SDK:', error);
 });
 
+// تابع کمکی برای fetch با تایم‌اوت و retry
+async function fetchWithTimeoutAndRetry(url: string, options: RequestInit, timeout = 5000, retries = 3): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+      return response;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      console.log(`[Fetch] Attempt ${i + 1} failed: ${(error as Error).message}. Retrying...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  throw new Error('Unexpected error in fetchWithTimeoutAndRetry');
+}
+
 // توابع
 function checkRateLimit(): { isAllowed: boolean; isLoading: boolean } {
   const now = Date.now();
@@ -135,14 +157,15 @@ app.use('/*', serveStatic({ root: './public' }));
 async function executeQuery(queryId: string): Promise<string | null> {
   console.log(`[API] Executing Query ${queryId} (Request #${++apiRequestCount}) - 1 credit consumed`);
   try {
-    const response = await fetch(`https://api.dune.com/api/v1/query/${queryId}/execute`, {
-      method: 'POST',
-      headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
+    const response = await fetchWithTimeoutAndRetry(
+      `https://api.dune.com/api/v1/query/${queryId}/execute`,
+      {
+        method: 'POST',
+        headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
+      },
+      5000,
+      3
+    );
     const data = await response.json() as { execution_id: string };
     console.log(`[API] Query ${queryId} execution started with ID: ${data.execution_id}`);
     return data.execution_id;
@@ -156,14 +179,15 @@ async function executeQuery(queryId: string): Promise<string | null> {
 async function fetchQueryResult(executionId: string, queryId: string): Promise<ApiRow[] | null> {
   console.log(`[API] Fetching results for Query ${queryId} with execution ID ${executionId} (Request #${++apiRequestCount}) - 1 credit consumed`);
   try {
-    const response = await fetch(`https://api.dune.com/api/v1/execution/${executionId}/results`, {
-      method: 'GET',
-      headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
+    const response = await fetchWithTimeoutAndRetry(
+      `https://api.dune.com/api/v1/execution/${executionId}/results`,
+      {
+        method: 'GET',
+        headers: { 'X-Dune-API-Key': '7mLA92ZMmtza1UvyP5Ug75mQtDgupmRK' }
+      },
+      5000,
+      3
+    );
     const data = await response.json() as { state: string; result?: { rows: ApiRow[] } };
     if (data.state === 'EXECUTING' || data.state === 'PENDING') {
       console.log(`[API] Query ${queryId} still executing or pending. Results not ready yet.`);
@@ -343,8 +367,8 @@ async function getWalletAddressFromFid(fid: string): Promise<{ wallet1: string |
     const response = await client.fetchBulkUsers({ fids: [Number(fid)] });
     const user = response.users[0];
     const ethAddresses = user?.verified_addresses?.eth_addresses || [];
-    const wallet1 = ethAddresses[0] || null; // آدرس وریفاید اول
-    const wallet2 = ethAddresses[1] || null; // آدرس وریفاید دوم (اگه باشه)
+    const wallet1 = ethAddresses[0] || null;
+    const wallet2 = ethAddresses[1] || null;
     console.log(`[Neynar] Verified wallets for FID ${fid}: Wallet1: ${wallet1}, Wallet2: ${wallet2}`);
     return { wallet1, wallet2 };
   } catch (error) {
@@ -375,39 +399,30 @@ async function isOGNFTHolder(fid: string): Promise<number> {
 
 async function isNewNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds New NFT from ${NEW_NFT_CONTRACT_ADDRESS} using offline data`);
-  
   try {
     const { wallet1, wallet2 } = await getWalletAddressFromFid(fid);
-
     if (!wallet1 && !wallet2) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
     }
-
     const holdersData = await fs.readFile(newHoldersFile, 'utf8');
     const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
-
     let count = 0;
-
     if (wallet1) {
       const holder1 = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
       count += holder1 ? holder1.count : 0;
     }
-
     if (wallet2) {
       const holder2 = holders.find(h => h.wallet.toLowerCase() === wallet2.toLowerCase());
       count += holder2 ? holder2.count : 0;
     }
-
     console.log(`[NFT] FID ${fid} (Wallets: ${wallet1}, ${wallet2}) holds ${count} New NFTs`);
     return count;
-
   } catch (error) {
     console.error(`[NFT] Error checking New NFT holder status offline: ${error}`);
     return 0;
   }
 }
-
 
 async function getUserDataFromCache(fid: string): Promise<{
   todayPeanutCount: number;
@@ -462,7 +477,7 @@ async function getUserDataFromCache(fid: string): Promise<{
     } else {
       maxAllowance = 0;
       remainingAllowance = 'mint your allowance';
-      reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : ''; // اینجا carbs رو با '' عوض کردم
+      reduceEndSeason = sentPeanutCount > maxAllowance ? String(sentPeanutCount - maxAllowance) : '';
     }
   }
 
@@ -526,7 +541,6 @@ app.frame('/', async (c) => {
 
   try {
     console.log("usertype:", Usertype);
-    
     return c.res({
       image: (
         <div
@@ -534,8 +548,8 @@ app.frame('/', async (c) => {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            width: "100%", 
-            height: "100%", 
+            width: "100%",
+            height: "100%",
             backgroundColor: "black",
             color: "white",
             fontFamily: "'Lilita One','Poppins'",
@@ -554,7 +568,6 @@ app.frame('/', async (c) => {
               left: 0,
             }}
           />
-    
           {pfpUrl && (
             <img
               src={anticURLSanitize(pfpUrl)}
@@ -570,7 +583,6 @@ app.frame('/', async (c) => {
               }}
             />
           )}
-    
           <p
             style={{
               position: "absolute",
@@ -584,7 +596,6 @@ app.frame('/', async (c) => {
           >
             {username}
           </p>
-    
           <p
             style={{
               position: "absolute",
@@ -598,7 +609,6 @@ app.frame('/', async (c) => {
           >
             {fid}
           </p>
-    
           <p
             style={{
               position: "absolute",
@@ -610,7 +620,6 @@ app.frame('/', async (c) => {
           >
             {totalPeanutCount}
           </p>
-    
           <p
             style={{
               position: "absolute",
@@ -653,7 +662,7 @@ app.frame('/', async (c) => {
               fontSize: "23px",
             }}
           >
-             {verifiedWallet2}
+            {verifiedWallet2}
           </p>
           <p
             style={{
@@ -666,7 +675,6 @@ app.frame('/', async (c) => {
           >
             {userRank}
           </p>
-
           {OGpic > 0 && (
             <img
               src="/og.png"
