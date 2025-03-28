@@ -380,7 +380,7 @@ async function getWalletAddressFromFid(fid: string): Promise<{ wallet1: string |
 async function isOGNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds OG NFT from ${OG_NFT_CONTRACT_ADDRESS} using offline data`);
   try {
-    const { wallet1 } = await getWalletAddressFromFid(fid);
+    const { wallet1 ,wallet2} = await getWalletAddressFromFid(fid);
     if (!wallet1) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
