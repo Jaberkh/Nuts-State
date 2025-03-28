@@ -352,7 +352,7 @@ function scheduleUpdates() {
   setInterval(async () => {
     console.log('[Scheduler] Checking for scheduled update');
     await updateQueries();
-  }, 5 * 60 * 1000);
+  }, 60 * 1000); // هر ۱ دقیقه چک کن
 }
 
 console.log('[Server] Starting update scheduler');
@@ -392,12 +392,14 @@ async function isOGNFTHolder(fid: string): Promise<number> {
 
     let count = 0;
 
+    // بررسی مالکیت برای wallet1
     if (wallet1) {
       const holder1 = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
       count += holder1 ? holder1.count : 0;
       console.log(`[NFT] FID ${fid} (Wallet1: ${wallet1}) holds ${holder1 ? holder1.count : 0} OG NFTs`);
     }
 
+    // بررسی مالکیت برای wallet2
     if (wallet2) {
       const holder2 = holders.find(h => h.wallet.toLowerCase() === wallet2.toLowerCase());
       count += holder2 ? holder2.count : 0;
@@ -573,7 +575,7 @@ app.frame('/', async (c) => {
           }}
         >
           <img
-            src="bg.png"
+            src="/bg.png"
             style={{
               width: "100%",
               height: "100%",

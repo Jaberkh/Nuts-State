@@ -90,7 +90,7 @@
     },
     {
       "wallet": "0x4dca2d825ef79df8e3191f4efd2326e220404a76",
-      "count": 2
+      "count": 1
     },
     {
       "wallet": "0xf678b660c5040ad6f6b1ee5a89fbd8c149d683bf",
@@ -145,5 +145,5 @@
       "count": 1
     }
   ],
-  "last_updated": 1743146374155
+  "last_updated": 1743157919440
 }
