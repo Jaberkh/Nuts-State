@@ -380,22 +380,36 @@ async function getWalletAddressFromFid(fid: string): Promise<{ wallet1: string |
 async function isOGNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds OG NFT from ${OG_NFT_CONTRACT_ADDRESS} using offline data`);
   try {
-    const { wallet1 ,wallet2} = await getWalletAddressFromFid(fid);
-    if (!wallet1) {
+    const { wallet1, wallet2 } = await getWalletAddressFromFid(fid);
+    if (!wallet1 && !wallet2) {
       console.log(`[NFT] No wallet address found for FID ${fid}`);
       return 0;
     }
+
     const holdersData = await fs.readFile(ogHoldersFile, 'utf8');
     const { holders }: { holders: NFTHolder[] } = JSON.parse(holdersData);
-    const holder = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
-    const count = holder ? holder.count : 0;
-    console.log(`[NFT] FID ${fid} (Wallet: ${wallet1}) holds ${count} OG NFTs`);
+
+    let count = 0;
+
+    if (wallet1) {
+      const holder1 = holders.find(h => h.wallet.toLowerCase() === wallet1.toLowerCase());
+      count += holder1 ? holder1.count : 0;
+      console.log(`[NFT] FID ${fid} (Wallet1: ${wallet1}) holds ${holder1 ? holder1.count : 0} OG NFTs`);
+    }
+
+    if (wallet2) {
+      const holder2 = holders.find(h => h.wallet.toLowerCase() === wallet2.toLowerCase());
+      count += holder2 ? holder2.count : 0;
+      console.log(`[NFT] FID ${fid} (Wallet2: ${wallet2}) holds ${holder2 ? holder2.count : 0} OG NFTs`);
+    }
+
     return count;
   } catch (error) {
     console.error(`[NFT] Error checking OG holder status offline: ${error}`);
     return 0;
   }
 }
+
 
 async function isNewNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds New NFT from ${NEW_NFT_CONTRACT_ADDRESS} using offline data`);
