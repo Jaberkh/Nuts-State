@@ -572,7 +572,7 @@ app.frame('/', async (c) => {
           }}
         >
           <img
-            src="https://i.imgur.com/CD7K8ps.png"
+            src="/bg.png"
             style={{
               width: "100%",
               height: "100%",
@@ -691,7 +691,7 @@ app.frame('/', async (c) => {
           </p>
           {OGpic > 0 && (
             <img
-              src="https://i.imgur.com/VGVCmb4.png"
+              src="/og.png"
               width="131"
               height="187"
               style={{
@@ -703,7 +703,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="https://i.imgur.com/0mL0PxL.png"
+              src="/member.png"
               width="100"
               height="100"
               style={{
@@ -715,7 +715,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="https://i.imgur.com/q3W0SyU.png"
+              src="/regular.png"
               width="100"
               height="100"
               style={{
@@ -727,7 +727,7 @@ app.frame('/', async (c) => {
           )}
           {Usertype === "Active" && (
             <img
-              src="https://i.imgur.com/Se4oBdM.png"
+              src="/active.png"
               width="100"
               height="100"
               style={{
