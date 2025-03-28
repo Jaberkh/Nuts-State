@@ -241,7 +241,8 @@ function shouldUpdateApi(lastUpdated: number, isCacheEmpty: boolean): boolean {
   const utcHours = now.getUTCHours();
   const utcMinutes = now.getUTCMinutes();
   const totalMinutes = utcHours * 60 + utcMinutes;
-  const updateTimes = [0];
+  // آپدیت‌ها در ۰۰:۰۰ (0)، ۰۶:۰۰ (360)، ۱۲:۰۰ (720) و ۲۱:۰۰ (1260) UTC
+  const updateTimes = [0, 360,576, 720, 1260];
 
   if (isCacheEmpty) {
     console.log(`[UpdateCheck] Cache is empty. Allowing immediate update at ${utcHours}:${utcMinutes} UTC`);
@@ -351,7 +352,7 @@ function scheduleUpdates() {
   setInterval(async () => {
     console.log('[Scheduler] Checking for scheduled update');
     await updateQueries();
-  }, 5 * 60 * 1000);
+  }, 60 * 1000); // هر ۱ دقیقه چک کن
 }
 
 console.log('[Server] Starting update scheduler');
@@ -409,7 +410,6 @@ async function isOGNFTHolder(fid: string): Promise<number> {
     return 0;
   }
 }
-
 
 async function isNewNFTHolder(fid: string): Promise<number> {
   console.log(`[NFT] Checking if FID ${fid} holds New NFT from ${NEW_NFT_CONTRACT_ADDRESS} using offline data`);
@@ -572,7 +572,7 @@ app.frame('/', async (c) => {
           }}
         >
           <img
-            src="/bg.png"
+            src="https://i.imgur.com/CD7K8ps.png"
             style={{
               width: "100%",
               height: "100%",
@@ -691,7 +691,7 @@ app.frame('/', async (c) => {
           </p>
           {OGpic > 0 && (
             <img
-              src="/og.png"
+              src="https://i.imgur.com/VGVCmb4.png"
               width="131"
               height="187"
               style={{
@@ -703,7 +703,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Member" || Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="/member.png"
+              src="https://i.imgur.com/0mL0PxL.png"
               width="100"
               height="100"
               style={{
@@ -715,7 +715,7 @@ app.frame('/', async (c) => {
           )}
           {(Usertype === "Regular" || Usertype === "Active") && (
             <img
-              src="/regular.png"
+              src="https://i.imgur.com/q3W0SyU.png"
               width="100"
               height="100"
               style={{
@@ -727,7 +727,7 @@ app.frame('/', async (c) => {
           )}
           {Usertype === "Active" && (
             <img
-              src="/active.png"
+              src="https://i.imgur.com/Se4oBdM.png"
               width="100"
               height="100"
               style={{
